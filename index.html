@@ -124,6 +124,17 @@
     </div>
 </div>
 
+<!-- 服务协议 / 隐私政策弹窗 -->
+<div id="tosModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[180] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-auto">
+        <div class="p-5 border-b sticky top-0 bg-white flex justify-between items-center">
+            <span class="font-bold text-lg" id="tosTitle">服务协议与隐私政策</span>
+            <button id="closeTosBtn" class="text-slate-400 hover:text-slate-600 text-2xl leading-5">&times;</button>
+        </div>
+        <div class="p-5 text-sm leading-relaxed text-slate-700 space-y-4" id="tosContent"></div>
+    </div>
+</div>
+
 <!-- 充值弹窗 -->
 <div id="rechargeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -145,7 +156,24 @@
 <!-- 作业批改弹窗 -->
 <div id="hwAnalysisModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-auto shadow-2xl"><div class="p-4 border-b flex justify-between"><span class="font-bold">📝 作业智能批改 (消耗1次)</span><button id="closeHwModal" class="text-slate-400 text-xl">&times;</button></div><div class="p-4 space-y-4"><div class="bg-blue-50 p-2 rounded text-xs text-blue-800">✨ 可拍照/上传多张图片，AI综合分析所有图片中的作业内容。</div><div class="bg-black rounded-xl overflow-hidden aspect-video"><video id="hwVideo" autoplay playsinline class="w-full h-full object-cover"></video><canvas id="hwCanvas" class="hidden"></canvas></div><div class="flex flex-wrap gap-2"><button id="captureHwPhotoBtn" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg">📸 拍照并添加</button><button id="switchHwCameraBtn" class="flex-1 border border-slate-300 rounded-lg py-2">🔄 切换</button><label class="flex-1 bg-slate-100 text-center py-2 rounded-lg border cursor-pointer hover:bg-slate-200 transition">📂 上传图片<input id="uploadHwImage" type="file" accept="image/*" multiple class="hidden"></label></div><div id="imageListContainer" class="border rounded-lg p-2 bg-gray-50"><p class="text-xs font-semibold mb-2">📸 待分析图片（点击❌移除）</p><div id="imageList" class="flex flex-wrap gap-2"></div></div><div class="border-t pt-3"><label class="flex items-center gap-2 text-sm font-medium"><input id="provideAnswerCheckbox" type="checkbox"> ✍️ 提供参考答案</label><div id="answerInputDiv" class="hidden mt-2"><textarea id="homeworkAnswerText" rows="3" placeholder="请输入参考答案…" class="w-full border rounded-lg p-2 text-sm"></textarea></div></div><button id="startHomeworkAnalysisBtn" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-semibold hover:bg-emerald-700 transition">🤖 AI 分析作业 (消耗1次)</button><div id="hwAnalysisResultArea" class="hidden bg-slate-50 p-3 rounded-lg"><p class="font-semibold">📊 批改结果：</p><div id="hwAnalysisResultContent" class="text-sm whitespace-pre-wrap max-h-60 overflow-auto"></div><div class="flex gap-2 mt-3"><button id="applyToHomeworkBtn" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-sm">📋 应用至作业情况</button><button id="applyToNoteBtn" class="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm">📌 应用至教师补充</button></div></div></div></div></div>
 
-<div class="text-center py-4 text-xs text-slate-400 sm:hidden">📱 购买次数 / 商务合作：<b class="text-green-600">folltoting</b></div>
+<!-- 页脚 -->
+<div class="max-w-7xl mx-auto px-3 sm:px-5 lg:px-8 pb-6">
+    <div class="bg-white rounded-2xl shadow-sm border p-5 text-xs text-slate-500 space-y-3">
+        <div class="flex flex-wrap justify-between items-center gap-3">
+            <div>
+                <b class="text-slate-700">📖 使用说明</b>
+                <p class="mt-1">新设备赠送 5 次免费使用 · 每次 AI 生成/批改消耗 1 次 · 次数存在浏览器本地，更换设备或清理缓存后次数单独计算 · 充值码一次一码，兑换后即时生效</p>
+            </div>
+            <div class="flex gap-3 flex-wrap">
+                <span class="cursor-pointer text-indigo-600 hover:underline" onclick="showTos('terms')">服务协议</span>
+                <span class="cursor-pointer text-indigo-600 hover:underline" onclick="showTos('privacy')">隐私政策</span>
+                <span class="text-slate-400">📱 微信：<b class="text-green-600">folltoting</b></span>
+            </div>
+        </div>
+            <p class="text-slate-400">使用本工具即表示您已同意<a class="text-indigo-600 hover:underline cursor-pointer" onclick="showTos('terms')">《服务协议》</a>和<a class="text-indigo-600 hover:underline cursor-pointer" onclick="showTos('privacy')">《隐私政策》</a>。</p>
+            <p class="text-slate-400">Secure by Supabase · AI powered by DeepSeek & 豆包</p>
+    </div>
+</div>
 
 <script>
 // ============================================================
@@ -639,15 +667,33 @@ async function redeemCode(code) {
 async function analyzeHw() {
     if (hwImages.length === 0) { toast('请先拍照或上传作业图片', 'error'); return; }
     if (getCr() < 1) { toast('次数不足', 'error'); return; }
-    var btn = document.getElementById('startHomeworkAnalysisBtn'); btn.disabled = true; btn.textContent = '⏳ AI 分析中…';
+    var btn = document.getElementById('startHomeworkAnalysisBtn'); btn.disabled = true; btn.textContent = '⏳ 上传图片并分析中…';
     document.getElementById('hwAnalysisResultArea').classList.add('hidden');
     try {
+        // 上传图片到 Supabase Storage 获取公网 URL
+        var imageUrls = [];
+        for (var i = 0; i < hwImages.length; i++) {
+            var blob = hwImages[i];
+            var fileName = 'hw_' + Date.now() + '_' + i + '.jpg';
+            var uploadResp = await sb.storage.from('homework-images').upload('public/' + fileName, blob, { contentType: 'image/jpeg', upsert: true });
+            if (uploadResp.error) throw new Error('图片上传失败：' + uploadResp.error.message);
+            var urlData = sb.storage.from('homework-images').getPublicUrl('public/' + fileName);
+            if (urlData.data && urlData.data.publicUrl) imageUrls.push(urlData.data.publicUrl);
+        }
+        if (imageUrls.length === 0) throw new Error('图片上传失败，请重试');
+
         var subject = curSubject, ans = document.getElementById('homeworkAnswerText').value;
-        var prompt = '请批改以下' + subject + '作业。' + (ans ? '参考答案：' + ans : '') + '请指出对错、评分和改进建议。';
-        var resp = await sb.functions.invoke('generate-feedback', { body: { prompt: prompt, model: 'deepseek' } });
+        var prompt = '请批改以上' + imageUrls.length + '张' + subject + '作业图片中的内容。' + (ans ? '参考答案：' + ans : '') + '请逐题指出对错、给出正确解法、评分（A/B/C/D等级）和综合评语。切记：只分析图片中实际出现的题目，不编造不猜测。';
+
+        // 用豆包视觉模型（自动识别图片内容）
+        var resp = await sb.functions.invoke('generate-feedback', {
+            body: { prompt: prompt, model: 'doubao', images: imageUrls }
+        });
         if (resp.error) throw new Error(resp.error.message);
         var data = resp.data;
         if (data && data.error) throw new Error(data.error);
+        if (!data || !data.content) throw new Error('AI 返回为空，请重试');
+
         document.getElementById('hwAnalysisResultContent').textContent = data.content;
         document.getElementById('hwAnalysisResultArea').classList.remove('hidden');
         useCr(); document.getElementById('creditBalance').innerText = getCr();
@@ -771,11 +817,59 @@ function init() {
     document.getElementById('applyToHomeworkBtn').onclick = function() { document.getElementById('homeworkCustom').value = document.getElementById('hwAnalysisResultContent').textContent; cc(); saveFC(); toast('已应用', 'success'); };
     document.getElementById('applyToNoteBtn').onclick = function() { document.getElementById('teacherCustomNote').value = document.getElementById('hwAnalysisResultContent').textContent; cc(); saveFC(); toast('已应用', 'success'); };
 
+    // 服务协议弹窗
+    document.getElementById('closeTosBtn').onclick = function() { document.getElementById('tosModal').classList.add('hidden'); };
+    document.getElementById('tosModal').onclick = function(e) { if (e.target === this) this.classList.add('hidden'); };
+
     // 遮罩关闭
     document.querySelectorAll('[id$="Modal"], [id$="ModalOverlay"]').forEach(function(el) { if (el) el.onclick = function(e) { if (e.target === this) this.classList.add('hidden'); }; });
 
     toast('👋 欢迎使用！新设备赠送 5 次免费次数', 'info');
 }
+
+// ======================= 服务协议 / 隐私政策 =======================
+var tosText = {
+    terms: '<h2 class="text-lg font-bold mb-3">服务协议</h2>' +
+        '<p><b>最后更新：2026年6月</b></p>' +
+        '<h3 class="font-bold mt-3">1. 服务说明</h3>' +
+        '<p>本工具为AI课后反馈生成器，利用人工智能技术辅助教师生成课后反馈文案和批改学生作业。每次AI生成或作业批改消耗1次使用次数。</p>' +
+        '<h3 class="font-bold mt-3">2. 使用规则</h3>' +
+        '<p>（1）新设备首次使用赠送5次免费次数。次数存储于浏览器本地，更换设备或清理浏览器缓存后次数将重置，已使用次数无法跨设备共享。</p>' +
+        '<p>（2）充值码由管理员生成，每个码仅限使用一次。兑换后次数即时增加至当前设备。</p>' +
+        '<p>（3）禁止利用本工具生成违法违规内容，包括但不限于：侮辱诽谤、色情暴力、危害国家安全等。一经发现将追究法律责任。</p>' +
+        '<p>（4）禁止通过技术手段破解、篡改或绕过次数限制。禁止对服务进行逆向工程。</p>' +
+        '<h3 class="font-bold mt-3">3. 免责声明</h3>' +
+        '<p>（1）AI生成内容仅供参考，不构成任何形式的承诺或保证。使用者应自行判断内容的准确性和适用性。</p>' +
+        '<p>（2）因网络故障、第三方服务中断等原因导致的服务不可用，本工具不承担责任。</p>' +
+        '<p>（3）本工具保留随时修改或终止服务的权利，无需另行通知。</p>' +
+        '<h3 class="font-bold mt-3">4. 联系方式</h3>' +
+        '<p>如有问题或建议，请联系微信：<b>folltoting</b></p>',
+    privacy: '<h2 class="text-lg font-bold mb-3">隐私政策</h2>' +
+        '<p><b>最后更新：2026年6月</b></p>' +
+        '<h3 class="font-bold mt-3">1. 我们收集什么信息</h3>' +
+        '<p><b>我们不收集任何个人身份信息。</b>本工具不需要注册账号，不收集姓名、手机号、邮箱等个人信息。使用次数仅存储在您设备的浏览器本地存储（localStorage）中，我们无法访问。</p>' +
+        '<h3 class="font-bold mt-3">2. 第三方服务</h3>' +
+        '<p>本工具使用以下第三方服务，其隐私政策请参阅各平台：</p>' +
+        '<p>· <b>Supabase</b> — 提供充值码验证等后端服务。充值时需向Supabase服务器发送充值码验证请求，但不包含个人身份信息。</p>' +
+        '<p>· <b>DeepSeek / 豆包（字节跳动）</b> — 提供AI内容生成服务。您输入的上课内容、学生信息等将发送至AI服务商用于生成反馈文案。请勿输入学生真实姓名或其他敏感个人信息（建议使用化名）。AI服务商可能按照其隐私政策处理请求数据。</p>' +
+        '<h3 class="font-bold mt-3">3. 数据安全</h3>' +
+        '<p>（1）所有数据传输均通过HTTPS加密。</p>' +
+        '<p>（2）AI调用通过Supabase Edge Function中转，API密钥存储在云端，不会暴露给客户端。</p>' +
+        '<p>（3）充值码由加密算法生成，保证唯一性和安全性。</p>' +
+        '<h3 class="font-bold mt-3">4. 您的权利</h3>' +
+        '<p>（1）由于我们不收集个人信息，您无需担心数据删除或导出的问题。</p>' +
+        '<p>（2）您可以随时清除浏览器缓存来删除所有本地存储的数据（包括使用次数）。</p>' +
+        '<h3 class="font-bold mt-3">5. 联系我们</h3>' +
+        '<p>隐私相关问题请联系微信：<b>folltoting</b></p>'
+};
+
+function showTos(type) {
+    document.getElementById('tosTitle').textContent = type === 'terms' ? '服务协议' : '隐私政策';
+    document.getElementById('tosContent').innerHTML = tosText[type];
+    document.getElementById('tosModal').classList.remove('hidden');
+}
+
+// TOS弹窗关闭事件（在init中绑定）
 
 document.addEventListener('DOMContentLoaded', init);
 </script>

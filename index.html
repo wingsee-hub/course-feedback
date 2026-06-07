@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+<title>AI 课后反馈生成器</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#f8fafc;border-radius:10px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:10px}
+.input-focus-ring:focus{box-shadow:0 0 0 3px rgba(99,102,241,.12);border-color:#818cf8;outline:none}
+.result-content{white-space:pre-wrap;word-wrap:break-word;line-height:1.8;font-size:.95rem;color:#1e293b}
+.btn-gradient{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);box-shadow:0 6px 16px rgba(79,70,229,.25);transition:all .2s}
+.btn-gradient:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(79,70,229,.35)}
+.btn-gradient:disabled{opacity:.5;transform:none;cursor:not-allowed}
+.preset-tag{transition:all .2s;cursor:pointer;user-select:none;display:inline-block;margin:.2rem}
+.preset-tag.selected{box-shadow:0 0 0 2px currentColor;background-color:rgba(99,102,241,.1);border-color:#6366f1;color:#4f46e5}
+.preset-tag.negative{border-left:2px solid #f97316}
+.preset-tag.negative.selected{background-color:rgba(249,115,22,.1);border-color:#f97316;color:#ea580c}
+.style-btn.active{box-shadow:0 0 0 2px #6366f1;transform:scale(1.02);background-color:#eef2ff;border-color:#6366f1!important;color:#4f46e5}
+.custom-block-item{background:#faf5ff;border-left:3px solid #a78bfa;transition:.2s}
+.toast-enter{animation:toastIn .3s ease-out}@keyframes toastIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+.subject-tab{cursor:pointer;transition:all .2s;background:#fff;border-radius:2rem;padding:.3rem 1rem;font-size:.85rem;font-weight:500;border:1px solid #e2e8f0;color:#334155}
+.subject-tab.active{background:#4f46e5;color:#fff;border-color:#4f46e5;box-shadow:0 4px 8px rgba(79,70,229,.2)}
+.image-list-item{position:relative;display:inline-block;margin:0 8px 8px 0}
+.image-list-item .remove-img{position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;border-radius:50%;width:20px;height:20px;font-size:12px;text-align:center;line-height:18px;cursor:pointer;border:1px solid #fff}
+.credit-badge{background:#fef9c3;border-radius:40px;padding:4px 14px;font-weight:700;font-size:.9rem;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+</style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-indigo-50/20 to-white min-h-screen">
+
+<div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-2 pointer-events-none"></div>
+
+<div class="max-w-7xl mx-auto px-3 sm:px-5 lg:px-8 py-4 sm:py-6">
+    <!-- 顶部栏 -->
+    <div class="bg-white rounded-2xl shadow-sm border p-3 mb-5 flex flex-wrap justify-between items-center gap-2">
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold text-slate-700">⭐ 剩余次数</span>
+            <span id="creditBalance" class="credit-badge text-amber-700 bg-amber-100">5</span>
+            <span class="text-xs text-slate-400">(每次生成/AI批改消耗1次)</span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs text-slate-400 hidden sm:inline">📱 购买次数请加微信 <b class="text-green-600">folltoting</b></span>
+            <button id="showRechargeBtn" class="bg-amber-400 hover:bg-amber-500 text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-sm transition">💰 充值</button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- 左侧表单 -->
+        <div class="lg:col-span-7 space-y-5">
+            <div class="bg-white rounded-2xl shadow-sm border p-5">
+                <!-- 学科 -->
+                <div id="subjectTabs" class="flex flex-wrap gap-2 mb-4 pb-3 border-b"></div>
+                <!-- 班级 + 学生 -->
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <div class="flex-1 min-w-[140px]"><label class="text-xs font-semibold">🏷️ 班级</label><div class="flex gap-1"><select id="classSelect" class="input-focus-ring flex-1 px-3 py-2 rounded-xl border bg-slate-50"></select><button id="openClassModalBtn" title="管理班级" class="px-3 bg-indigo-50 rounded-xl text-indigo-600 hover:bg-indigo-100">⚙️</button></div></div>
+                    <div class="flex-1 min-w-[140px]"><label class="text-xs font-semibold">👤 学生姓名</label><input id="studentNameInput" placeholder="输入或点击下方标签" class="input-focus-ring w-full px-3 py-2 rounded-xl border"><div id="studentNamePresets" class="flex flex-wrap gap-1.5 mt-2"></div></div>
+                </div>
+                <!-- 上课内容 -->
+                <div class="mb-4"><label class="text-xs font-semibold">📚 上课内容（可多选标签，标签决定后续选项）</label><div id="lessonPresets" class="flex flex-wrap gap-1.5 my-2"></div><input id="lessonCustom" placeholder="💬 补充内容…" class="input-focus-ring w-full px-3 py-2 rounded-lg border text-sm mt-1"><span id="lessonCharCount" class="text-xs text-slate-400">0/200</span></div>
+                <!-- 课堂亮点 -->
+                <div class="mb-4"><label class="text-xs font-semibold text-emerald-700">✨ 课堂亮点（基于所选内容动态展示）</label><div id="positivePerformancePresets" class="flex flex-wrap gap-1.5 my-2 bg-emerald-50/30 p-2 rounded-lg min-h-[40px]"></div><div class="flex gap-2 mt-1"><input id="newPositiveInput" placeholder="自定义亮点" class="flex-1 input-focus-ring px-3 py-1.5 rounded-lg border text-sm"><button id="addPositiveCustomBtn" class="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm whitespace-nowrap hover:bg-emerald-600">➕ 添加</button></div><input id="positiveCustom" placeholder="💬 补充亮点…" class="input-focus-ring w-full mt-2 px-3 py-2 rounded-lg border text-sm"><span id="positiveCharCount" class="text-xs">0/200</span></div>
+                <!-- 待提升 -->
+                <div class="mb-4"><label class="text-xs font-semibold text-amber-700">⚠️ 待提升方面（基于所选内容动态展示）</label><div id="negativePerformancePresets" class="flex flex-wrap gap-1.5 my-2 bg-amber-50/30 p-2 rounded-lg min-h-[40px]"></div><div class="flex gap-2 mt-1"><input id="newNegativeInput" placeholder="自定义待提升点" class="flex-1 input-focus-ring px-3 py-1.5 rounded-lg border text-sm"><button id="addNegativeCustomBtn" class="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm whitespace-nowrap hover:bg-amber-700">➕ 添加</button></div><input id="negativeCustom" placeholder="💬 补充待改进…" class="input-focus-ring w-full mt-2 px-3 py-2 rounded-lg border text-sm"><span id="negativeCharCount" class="text-xs">0/200</span></div>
+                <!-- 学习状态 -->
+                <div class="mb-4"><label class="text-xs font-semibold">📊 学习状态</label><div id="statusPresets" class="flex flex-wrap gap-1.5 my-2 bg-slate-50 p-2 rounded-lg max-h-40 overflow-y-auto"></div><input id="statusCustom" placeholder="💬 补充其他状态…" class="input-focus-ring w-full px-3 py-2 rounded-lg border text-sm"><span id="statusCharCount" class="text-xs">0/200</span></div>
+                <!-- 作业 -->
+                <div class="mb-4"><div class="flex justify-between items-center"><label class="text-xs font-semibold">📝 作业情况</label><button id="openHomeworkAnalysisBtn" class="text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200 hover:bg-amber-100 transition">📷 拍照批改</button></div><div id="homeworkPresets" class="flex flex-wrap gap-1.5 my-2"></div><input id="homeworkCustom" placeholder="💬 补充作业细节…" class="input-focus-ring w-full px-3 py-2 rounded-lg border text-sm"><span id="hwCharCount" class="text-xs">0/200</span></div>
+                <!-- 教师补充 -->
+                <div class="mb-3"><label class="text-xs font-semibold">✍️ 教师补充</label><textarea id="teacherCustomNote" rows="2" placeholder="个性化寄语…" class="input-focus-ring w-full rounded-xl border p-2 text-sm" maxlength="600"></textarea><span id="teacherNoteCharCount" class="text-xs">0/600</span></div>
+                <div class="flex justify-end"><button id="clearFormBtn" class="text-sm text-slate-400 hover:text-red-500 transition">🗑️ 清空表单</button></div>
+            </div>
+        </div>
+
+        <!-- 右侧 -->
+        <div class="lg:col-span-5 space-y-5">
+            <!-- 风格 + 字数 + 仿写 -->
+            <div class="bg-white rounded-2xl shadow-sm border p-5">
+                <h3 class="font-bold text-sm mb-3">🎨 文案风格</h3>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button data-style="formal" class="style-btn active px-3 py-2 rounded-xl text-sm border-2">📑 官方严谨</button>
+                    <button data-style="friendly" class="style-btn px-3 py-2 rounded-xl text-sm border-2">💬 亲切温雅</button>
+                    <button data-style="brief" class="style-btn px-3 py-2 rounded-xl text-sm border-2">⚡ 干练精准</button>
+                    <button data-style="literary" class="style-btn px-3 py-2 rounded-xl text-sm border-2">🌸 文艺书香</button>
+                </div>
+                <label class="text-xs font-semibold">📏 字数</label>
+                <select id="wordCountSelect" class="input-focus-ring w-full mt-1 px-3 py-2 rounded-lg border">
+                    <option value="150">精简版 (150字内)</option>
+                    <option value="350" selected>标准版 (300-450字)</option>
+                    <option value="600">详细版 (500-700字)</option>
+                    <option value="900">完整版 (800-1000字)</option>
+                </select>
+                <div class="mt-3"><label class="text-xs font-semibold">✍️ 风格仿写（粘贴旧反馈，AI模仿风格）</label><textarea id="imitateStyleInput" rows="2" placeholder="粘贴您以往写的反馈…" class="input-focus-ring w-full rounded-xl border p-2 text-sm"></textarea><span id="imitateCharCount" class="text-xs">0/1500</span></div>
+            </div>
+
+            <!-- 板块配置 -->
+            <div class="bg-white rounded-2xl shadow-sm border p-5">
+                <h3 class="font-bold text-sm mb-2">📌 输出板块配置</h3>
+                <div id="sectionsChecklist" class="grid grid-cols-2 gap-2 my-3"></div>
+                <div class="border-t pt-3"><label class="text-xs font-semibold">📎 自定义板块</label><div id="customSectionsContainer" class="space-y-2 my-2"></div><button id="addCustomSectionBtn" class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">+ 添加自定义板块</button></div>
+            </div>
+
+            <!-- 生成按钮 -->
+            <button id="generateBtn" class="btn-gradient w-full py-3.5 rounded-xl text-white font-bold text-lg flex items-center justify-center gap-2">
+                ✨ AI 智能生成反馈 (消耗1次)
+                <svg id="genSpinner" class="animate-spin w-5 h-5 hidden" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+            </button>
+
+            <!-- 结果 -->
+            <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                <div class="flex justify-between items-center px-5 py-3 border-b bg-indigo-50/30">
+                    <span class="font-bold text-sm">📄 生成结果</span>
+                    <div class="flex gap-2"><button id="copyResultBtn" class="text-xs text-slate-500 hover:text-indigo-600 disabled:opacity-40" disabled>📋 复制</button><button id="downloadResultBtn" class="text-xs text-slate-500 hover:text-indigo-600" disabled>💾 下载</button></div>
+                </div>
+                <div id="resultArea" class="p-5 min-h-[280px] max-h-[500px] overflow-y-auto">
+                    <div id="resultPlaceholder" class="text-center text-slate-400 py-10"><span class="text-4xl">✨</span><p class="mt-2">填写信息，点击上方按钮生成</p></div>
+                    <div id="resultLoading" class="hidden text-center py-10"><div class="animate-pulse text-indigo-500">🤖 AI 正在精心编写反馈…</div></div>
+                    <div id="resultError" class="hidden text-center text-red-500 py-10"></div>
+                    <div id="resultContent" class="hidden result-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 充值弹窗 -->
+<div id="rechargeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div class="px-5 py-4 border-b flex justify-between items-center bg-gradient-to-r from-amber-50 to-yellow-50"><span class="font-bold text-amber-800">💰 次数充值</span><button id="closeRechargeBtn" class="text-slate-400 hover:text-slate-600 text-2xl leading-5">&times;</button></div>
+        <div class="p-5 space-y-4">
+            <div class="bg-blue-50 p-3 rounded-lg text-sm text-blue-800">💡 输入老师给您的充值码，每个码仅可使用一次。</div>
+            <div class="flex gap-2"><input id="rechargeCodeInput" placeholder="请输入充值码" class="flex-1 border rounded-xl px-4 py-2.5 input-focus-ring text-sm uppercase tracking-wider text-center font-mono text-lg"><button id="submitRechargeBtn" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2 rounded-xl font-bold transition">兑换</button></div>
+            <div class="text-xs text-center text-slate-400 border-t pt-3">📱 购买次数请联系微信：<b class="text-green-600">folltoting</b></div>
+        </div>
+    </div>
+</div>
+
+<!-- 班级管理弹窗 -->
+<div id="classModalOverlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"><div class="flex items-center justify-between px-5 py-3 border-b bg-indigo-50/40"><h3 class="font-bold">🏫 班级与学生管理</h3><button id="closeClassModalBtn" class="text-slate-400 hover:text-slate-600">✕</button></div><div class="flex-1 overflow-hidden flex flex-col sm:flex-row"><div class="sm:w-48 border-r p-3 bg-slate-50/40"><p class="text-xs font-semibold mb-2">班级列表</p><div id="classListInModal" class="space-y-1 max-h-48 overflow-auto"></div><button id="addClassBtn" class="mt-2 text-xs text-indigo-600 hover:underline">+ 新增班级</button><button id="cameraRecognizeBtn" class="mt-3 w-full text-xs bg-indigo-100 text-indigo-700 py-1.5 rounded-lg hover:bg-indigo-200 transition">📷 拍照识别学生</button></div><div class="flex-1 p-4"><div class="flex justify-between"><span class="text-xs font-semibold">学生名单<span id="modalClassName"></span></span><span id="studentCountInModal" class="text-xs"></span></div><div id="studentListInModal" class="space-y-1.5 max-h-60 overflow-auto mb-3"></div><div class="flex gap-2"><input id="newStudentInput" placeholder="新学生姓名" class="input-focus-ring flex-1 px-3 py-2 rounded-lg border text-sm"><button id="addStudentBtn" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600 transition">+ 添加</button></div><p class="text-xs text-slate-400 mt-2">💡 点击姓名可编辑，右侧按钮删除</p></div></div><div class="px-5 py-3 border-t flex justify-end bg-slate-50"><button id="doneClassModalBtn" class="px-6 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition">完成</button></div></div></div>
+
+<!-- 相机弹窗 -->
+<div id="cameraModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-auto shadow-2xl"><div class="p-4 border-b flex justify-between"><span class="font-bold">📸 拍照识别学生名单</span><button id="closeCameraModal" class="text-slate-400 text-xl">&times;</button></div><div class="p-4"><div class="bg-black rounded-xl overflow-hidden aspect-video"><video id="cameraVideo" autoplay playsinline class="w-full h-full object-cover"></video><canvas id="cameraCanvas" class="hidden"></canvas></div><div class="flex gap-2 mt-3"><button id="capturePhotoBtn" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg">📸 拍照识别</button><button id="switchCameraBtn" class="flex-1 border border-slate-300 rounded-lg py-2">🔄 切换摄像头</button></div><div id="ocrResultArea" class="mt-4 hidden"><p class="text-sm font-semibold">📋 候选姓名（点击选中，再点取消）：</p><div id="recognizedNamesList" class="flex flex-wrap gap-2 my-2"></div><button id="addRecognizedNamesBtn" class="bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-sm">➕ 添加到当前班级</button></div><div id="ocrLoading" class="mt-3 text-center text-slate-500 hidden animate-pulse">🔍 识别中…</div></div></div></div>
+
+<!-- 作业批改弹窗 -->
+<div id="hwAnalysisModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-auto shadow-2xl"><div class="p-4 border-b flex justify-between"><span class="font-bold">📝 作业智能批改 (消耗1次)</span><button id="closeHwModal" class="text-slate-400 text-xl">&times;</button></div><div class="p-4 space-y-4"><div class="bg-blue-50 p-2 rounded text-xs text-blue-800">✨ 可拍照/上传多张图片，AI综合分析所有图片中的作业内容。</div><div class="bg-black rounded-xl overflow-hidden aspect-video"><video id="hwVideo" autoplay playsinline class="w-full h-full object-cover"></video><canvas id="hwCanvas" class="hidden"></canvas></div><div class="flex flex-wrap gap-2"><button id="captureHwPhotoBtn" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg">📸 拍照并添加</button><button id="switchHwCameraBtn" class="flex-1 border border-slate-300 rounded-lg py-2">🔄 切换</button><label class="flex-1 bg-slate-100 text-center py-2 rounded-lg border cursor-pointer hover:bg-slate-200 transition">📂 上传图片<input id="uploadHwImage" type="file" accept="image/*" multiple class="hidden"></label></div><div id="imageListContainer" class="border rounded-lg p-2 bg-gray-50"><p class="text-xs font-semibold mb-2">📸 待分析图片（点击❌移除）</p><div id="imageList" class="flex flex-wrap gap-2"></div></div><div class="border-t pt-3"><label class="flex items-center gap-2 text-sm font-medium"><input id="provideAnswerCheckbox" type="checkbox"> ✍️ 提供参考答案</label><div id="answerInputDiv" class="hidden mt-2"><textarea id="homeworkAnswerText" rows="3" placeholder="请输入参考答案…" class="w-full border rounded-lg p-2 text-sm"></textarea></div></div><button id="startHomeworkAnalysisBtn" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-semibold hover:bg-emerald-700 transition">🤖 AI 分析作业 (消耗1次)</button><div id="hwAnalysisResultArea" class="hidden bg-slate-50 p-3 rounded-lg"><p class="font-semibold">📊 批改结果：</p><div id="hwAnalysisResultContent" class="text-sm whitespace-pre-wrap max-h-60 overflow-auto"></div><div class="flex gap-2 mt-3"><button id="applyToHomeworkBtn" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-sm">📋 应用至作业情况</button><button id="applyToNoteBtn" class="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm">📌 应用至教师补充</button></div></div></div></div></div>
+
+<div class="text-center py-4 text-xs text-slate-400 sm:hidden">📱 购买次数 / 商务合作：<b class="text-green-600">folltoting</b></div>
+
+<script>
+// ============================================================
+// Supabase（仅用于充值码兑换）
+// ============================================================
+const sb = window.supabase.createClient(
+    "https://fopqrvgimqexrpyzshoo.supabase.co",
+    "sb_publishable_ieY-41YXgwImaVbuhRpniw_LPZ3_yBY"
+);
+
+// ============================================================
+// 全局状态
+// ============================================================
+const CK = 'cf_credits';
+let curSubject = '语文', curStyle = 'formal', wordCount = 350, generating = false, genText = '';
+let classesData = [], curClassId = null;
+let hwImages = [];
+let subData = {};
+function getCr() { let c = localStorage.getItem(CK); return c ? parseInt(c) : 5; }
+function setCr(n) { localStorage.setItem(CK, Math.max(0, n)); document.getElementById('creditBalance').innerText = Math.max(0, n); }
+function useCr() { let c = getCr(); if (c < 1) return false; setCr(c - 1); return true; }
+function addCr(n) { setCr(getCr() + n); }
+
+// ============================================================
+// Toast / 工具函数
+// ============================================================
+function toast(m, t) { let e = document.createElement('div'); e.className = 'toast-enter ' + (t === 'error' ? 'bg-red-500' : t === 'success' ? 'bg-emerald-600' : 'bg-slate-800') + ' text-white px-4 py-2 rounded-lg shadow-lg text-sm mb-2'; e.textContent = m; document.getElementById('toastContainer').appendChild(e); setTimeout(function() { e.remove(); }, 2500); }
+function sd() { return subData[curSubject]; }
+function saveSub() { localStorage.setItem('cf_subjects', JSON.stringify(subData)); }
+function loadSub() { let d = localStorage.getItem('cf_subjects'); if (d) subData = JSON.parse(d); }
+function saveCls() { localStorage.setItem('cf_classes', JSON.stringify(classesData)); }
+function loadCls() { let c = localStorage.getItem('cf_classes'); if (c) classesData = JSON.parse(c); else classesData = [{ id: 'c1', name: '五年级(1)班', students: ['张子轩', '李雨桐'] }]; if (!curClassId && classesData.length > 0) curClassId = classesData[0].id; }
+function esc(s) { if (!s) return ''; return s.replace(/[&<>]/g, function(m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]; }); }
+function saveFC() { let d = sd(); d.fc = { sn: document.getElementById('studentNameInput').value, lc: document.getElementById('lessonCustom').value, pc: document.getElementById('positiveCustom').value, nc: document.getElementById('negativeCustom').value, sc: document.getElementById('statusCustom').value, hc: document.getElementById('homeworkCustom').value, tc: document.getElementById('teacherCustomNote').value, im: document.getElementById('imitateStyleInput').value }; saveSub(); }
+function loadFC() { let c = sd().fc; document.getElementById('studentNameInput').value = c.sn || ''; document.getElementById('lessonCustom').value = c.lc || ''; document.getElementById('positiveCustom').value = c.pc || ''; document.getElementById('negativeCustom').value = c.nc || ''; document.getElementById('statusCustom').value = c.sc || ''; document.getElementById('homeworkCustom').value = c.hc || ''; document.getElementById('teacherCustomNote').value = c.tc || ''; document.getElementById('imitateStyleInput').value = c.im || ''; cc(); }
+function cc() {
+    document.getElementById('lessonCharCount').textContent = document.getElementById('lessonCustom').value.length + '/200';
+    document.getElementById('positiveCharCount').textContent = document.getElementById('positiveCustom').value.length + '/200';
+    document.getElementById('negativeCharCount').textContent = document.getElementById('negativeCustom').value.length + '/200';
+    document.getElementById('statusCharCount').textContent = document.getElementById('statusCustom').value.length + '/200';
+    document.getElementById('hwCharCount').textContent = document.getElementById('homeworkCustom').value.length + '/200';
+    document.getElementById('teacherNoteCharCount').textContent = document.getElementById('teacherCustomNote').value.length + '/600';
+    document.getElementById('imitateCharCount').textContent = document.getElementById('imitateStyleInput').value.length + '/1500';
+}
+
+// ============================================================
+// 完整的四学科预设映射库
+// ============================================================
+const PS = {};
+
+// ---------- 语文 ----------
+(function() {
+    var L = ['古诗词讲解','文言文精读','阅读理解专项','作文写作指导','名著导读','字词基础训练','句式修辞训练','课文精讲','课外阅读拓展','现代文阅读','病句修改','标点符号训练','口语交际','书法练字','国学启蒙','拼音基础学习','看图写话训练','读后感写作','语文综合复习','考前冲刺辅导','散文赏析','说明文阅读','议论文阅读','非连续性文本阅读','古诗文默写','文学常识积累'];
+    var P = {};
+    P['古诗词讲解'] = ['诗词意象感悟深刻','背诵默写零错误','艺术手法分析专业','情感主旨把握独到','名句赏析有文采','炼字品味细致入微','对比阅读视角新颖','知人论世解读深入','韵律节奏感强'];
+    P['文言文精读'] = ['实词解释准确率高','虚词用法清晰','句子翻译信达雅','古今异义词辨析无误','特殊句式理解正确','词类活用掌握扎实','文言文断句准确','文化常识积累丰富','通假字识别准确','文言文朗读节奏恰当'];
+    P['阅读理解专项'] = ['概括主旨精准全面','赏析句子角度多元','人物形象分析透彻','标题作用理解深刻','环境描写作用分析到位','写作手法识别准确','细节题定位快速准确','开放性问答表达有创意','段落作用判断准确','修辞手法辨别熟练','上下文联系能力强','关键词句捕捉敏锐','作者情感脉络把握清晰'];
+    P['作文写作指导'] = ['审题立意准确新颖','结构层次清晰连贯','细节描写生动传神','开头结尾设计巧妙','语言富有文采','选材贴近生活富有真情','人物刻画立体','议论说理有据','过渡自然流畅','卷面整洁美观'];
+    P['名著导读'] = ['情节脉络梳理清晰','人物性格特征把握准确','主题思想理解深入','批注式阅读习惯好','跨章节联系能力强','作品背景了解透彻','人物关系图绘制清晰'];
+    P['字词基础训练'] = ['听写正确率100%','形近字辨析精准','多音字运用灵活','成语使用恰当','查字典速度快','偏旁部首理解到位','词语搭配丰富'];
+    P['句式修辞训练'] = ['修辞仿写生动','句式转换熟练','病句修改一针见血','缩句扩句规范','标点使用正确','排比对偶运用自如','长句变短句灵活'];
+    P['课文精讲'] = ['文本细读能力强','批注笔记详实','情感朗读感染力强','课堂质疑有深度','小组讨论发言精彩','课文复述完整流畅','关键段落品析深入'];
+    P['课外阅读拓展'] = ['阅读面拓宽','信息提取能力强','观点提炼清晰','阅读笔记有独立见解','跨文本比较意识增强','阅读量持续增加'];
+    P['现代文阅读'] = ['理解文章主旨精准','分析表现手法熟练','把握行文脉络清晰','语言品味敏感','情感体验共鸣深入'];
+    P['说明文阅读'] = ['说明方法判断准确','说明顺序梳理清晰','说明语言品析到位','信息筛选完整','概括说明对象特征精准','逻辑关系分析透彻'];
+    P['非连续性文本'] = ['图表信息提取快速','多材料对比整合能力强','结论推导严谨','数据变化趋势捕捉准确','观点提炼简洁'];
+    P['散文赏析'] = ['意境品味深入','语言风格鉴赏准确','形散神聚理解到位','抒情线索把握清晰'];
+    P['议论文阅读'] = ['论点提炼精准','论据分析透彻','论证方法识别熟练','论证结构清晰'];
+    P['古诗文默写'] = ['记忆准确无错字','书写规范','理解性默写正确'];
+    P['文学常识积累'] = ['作家作品对应正确','文体知识掌握牢固','文学流派了解清楚'];
+    P['口语交际'] = ['表达流畅有条理','倾听理解能力强','应对得体大方','观点陈述明确'];
+    P['书法练字'] = ['笔画规范','结构匀称','书写速度适中','卷面整洁度提升'];
+    P['国学启蒙'] = ['经典诵读熟练','典故理解准确','传统礼仪知晓','文化自信增强'];
+    P['拼音基础学习'] = ['声韵调掌握牢固','拼读快速准确','音节划分正确'];
+    P['看图写话训练'] = ['观察顺序清晰','想象合理丰富','句子通顺完整','标点使用正确'];
+    P['读后感写作'] = ['读感结合紧密','观点明确有深度','联系实际恰当','语言流畅'];
+    P['语文综合复习'] = ['知识网络构建清晰','易错点查漏补缺','综合运用能力强','复习效率高'];
+    P['考前冲刺辅导'] = ['应试技巧掌握','时间分配合理','审题避错意识强','心态稳定'];
+    P['病句修改'] = ['病句类型识别快速','修改方法得当','语感敏锐','表达规范意识强'];
+    P['标点符号训练'] = ['标点使用规范','引号分号顿号运用准确','停顿语气判断正确'];
+
+    var N = {};
+    N['古诗词讲解'] = ['诗词意象理解浅层','背诵默写有错字','艺术手法辨析不明','情感主题把握偏差','名句赏析套路化','炼字品味不足','背景知识缺失'];
+    N['文言文精读'] = ['实词解释混淆','虚词用法不熟练','翻译漏译错译','古今异义词误解','特殊句式语序颠倒','词类活用识别困难','断句错误较多','文化常识积累不足'];
+    N['阅读理解专项'] = ['概括主旨不够全面','赏析角度单一','人物形象标签化','标题作用理解模糊','环境描写忽略','答题格式不规范','信息筛选遗漏','开放性问答缺乏逻辑','段落作用判断失误','修辞手法辨识混淆','深层含义挖掘不足'];
+    N['作文写作指导'] = ['审题偏离','结构松散','描写干瘪','开头结尾平淡','语言口语化','选材老套','详略不当','中心不突出','卷面潦草','标点错用'];
+    N['名著导读'] = ['情节张冠李戴','人物性格脸谱化','主题理解肤浅','阅读批注过少','缺乏主动思考'];
+    N['字词基础训练'] = ['听写错误较多','形近字混淆','多音字误读','成语误用','书写潦草','错别字反复出现'];
+    N['句式修辞训练'] = ['修辞运用生硬','句式转换错误','病句找不出','缩句扩句不规范','标点错用','表达呆板'];
+    N['课文精讲'] = ['文本细读粗心','笔记不完整','朗读平淡','提问参与度低','合作效率低','复述遗漏重点'];
+    N['课外阅读拓展'] = ['阅读面窄','信息提取速度慢','观点提炼模糊','阅读笔记流于形式','缺乏独立思辨'];
+    N['现代文阅读'] = ['主旨理解偏差','表现手法识别不足','脉络梳理混乱','语言品味较弱','情感体会肤浅'];
+    N['说明文阅读'] = ['说明方法混淆','说明顺序不清','说明语言分析粗糙','信息筛选出错','特征概括不全'];
+    N['非连续性文本'] = ['图表数据提取慢','多材料整合能力弱','结论片面','遗漏关键信息'];
+    N['散文赏析'] = ['意境理解浅','语言风格不明','形散神聚把握不住','情感线索混乱'];
+    N['议论文阅读'] = ['论点找不准','论据作用不明','论证方法混淆','结构分析乱'];
+    N['古诗文默写'] = ['错字多','理解性默写错误','背诵不熟','书写不规范'];
+    N['文学常识积累'] = ['作家作品张冠李戴','文体知识模糊','记忆混淆'];
+    N['口语交际'] = ['表达卡顿','倾听抓不住重点','应对紧张','观点不清'];
+    N['书法练字'] = ['笔画错误','结构松散','书写速度慢','卷面脏乱'];
+    N['国学启蒙'] = ['背诵不熟','典故误解','礼仪欠佳','兴趣不足'];
+    N['拼音基础学习'] = ['声调混淆','拼读困难','音节切分错误','前后鼻音不分'];
+    N['看图写话训练'] = ['观察顺序乱','想象贫乏','句子不通顺','标点缺失'];
+    N['读后感写作'] = ['读感脱节','观点空洞','联系实际生硬','语言啰嗦'];
+    N['语文综合复习'] = ['知识体系零散','错题反复出错','综合运用薄弱','复习计划混乱'];
+    N['考前冲刺辅导'] = ['审题粗心','时间不够','紧张失误','基础漏洞多'];
+    N['病句修改'] = ['病句类型辨认困难','修改不当','语感不足','修改符号不规范'];
+    N['标点符号训练'] = ['标点混用','引号分号错误','停顿误用','一逗到底'];
+
+    var S = {};
+    S['古诗词讲解'] = ['诗词审美情趣逐步形成','背诵积累扎实','艺术手法敏感度提高','意象联想不够丰富','情感共鸣有待加深','知人论世能力需培养'];
+    S['文言文精读'] = ['文言文语感明显提升','实词积累日渐丰富','句子翻译流畅度增加','虚词辨析仍易混淆','课外迁移应用稍弱','断句准确性需加强','文化常识掌握不够系统'];
+    S['阅读理解专项'] = ['文本分析能力稳步提升','信息筛选整合能力强','深层含义挖掘意识增强','答题规范性进步明显','偶尔答题欠规范需提醒','阅读速度有待提高','开放性题目思维发散稍弱'];
+    S['作文写作指导'] = ['写作热情高涨','素材积累意识强','篇章构思趋于成熟','细节描写仍显单薄','开头结尾可更精巧','卷面整洁度需提升','议论深度待加强'];
+    S['名著导读'] = ['阅读耐力增强','批注习惯渐好','人物关系把握清晰','深度思考有待加强','情节归纳可更简练','主题提炼能力需提高'];
+    S['字词基础训练'] = ['基础夯实现阶段成效显著','错字率下降','自主复习习惯好','易错字反复出现','书写速度偏慢','同音字混淆较多'];
+    S['句式修辞训练'] = ['语言表达灵活度提升','仿写能力突出','病句敏感度增强','修辞运用偶尔生硬','句式单一需丰富','标点规范性不足'];
+    S['课文精讲'] = ['课堂专注度高','笔记整理系统','质疑探究意识萌芽','发言主动性不足','合作学习效率待提升','复述完整性需加强'];
+    S['课外阅读拓展'] = ['阅读面拓宽','信息提取能力强','观点提炼清晰','阅读笔记深度不足','思辨性欠缺','阅读量需进一步增加'];
+    S['现代文阅读'] = ['感知文本细腻度增加','答题规范进步明显','关键信息抓取准','情感体验较浅','分析逻辑偶有跳跃','主旨概括完整性不足'];
+    S['说明文阅读'] = ['逻辑思维严谨','说明方法辨识准确','语言品析进步','图表题易失误','信息整合偏慢','说明顺序判断易混淆'];
+    S['非连续性文本'] = ['实用文本阅读兴趣浓','数据对比快速','结论推导合理','跨文本联系弱','表达不够精炼','图文转换能力待提高'];
+    S['通用'] = ['课前预习习惯良好','课堂听讲专注度较高','笔记整理条理清晰','课后复习主动性强','错题反思意识浓厚','课堂互动稍显被动','学习毅力需进一步培养','自主学习能力逐步提高','知识迁移应用灵活','细节处理偶尔粗心','时间管理意识增强','作业按时完成习惯好'];
+
+    var H = ['作业完成优秀','作业完成一般','未按时完成','作业质量很高','作业潦草粗心','错题较多订正不及时','错题订正及时','书写工整','作业有创新点','作业漏题','作业按时提交','作业格式规范整洁','作文篇幅需要扩充','阅读笔记做得好','预习任务完成认真','复习巩固做得扎实'];
+    PS['语文'] = { L: L, P: P, N: N, S: S, H: H };
+})();
+
+// ---------- 数学 ----------
+(function() {
+    var L = ['数与代数','有理数运算','实数与二次根式','整式乘除','因式分解','分式与分式方程','一元一次方程','二元一次方程组','一元二次方程','不等式与不等式组','函数基础','一次函数','二次函数','反比例函数','图形与几何初步','全等三角形','相似形','勾股定理','平行四边形','特殊的平行四边形','圆的基本性质','圆的位置关系','锐角三角函数','解直角三角形','图形的变换','统计调查','数据分析','概率初步','数学思想方法','综合与实践'];
+    var P = {};
+    P['数与代数'] = ['算理清晰符号意识强','代数推理严谨变形准确','整体代入思想运用灵活','数感敏锐估算能力强','含参问题分类讨论完整'];
+    P['有理数运算'] = ['绝对值概念理解深刻','有理数加减法则运用熟练','乘方运算准确率高','数轴应用灵活比较大小正确','简便运算技巧娴熟'];
+    P['实数与二次根式'] = ['平方根立方根概念清晰','二次根式化简规范','分母有理化步骤完整','实数大小比较方法恰当','无理数估值准确'];
+    P['整式乘除'] = ['幂的运算法则掌握扎实','整式乘法公式运用熟练','多项式除以单项式准确','整体代入求值简便','合并同类项快速无误'];
+    P['因式分解'] = ['提公因式法精准','公式法运用灵活','十字相乘法快速','分组分解法合理','分解结果彻底规范'];
+    P['分式与分式方程'] = ['分式有意义条件考虑周全','分式化简步骤规范','解分式方程检验习惯好','增根识别准确','建模能力强'];
+    P['一元一次方程'] = ['移项变号准确','去分母不漏乘','解方程步骤规范','检验过程完整','实际问题等量关系准确'];
+    P['二元一次方程组'] = ['代入消元法熟练','加减消元法快速','解的意义理解深','含参方程组讨论完整','列方程准确'];
+    P['一元二次方程'] = ['直接开平方法灵活','配方法规范','公式法运用准确','因式分解法快速','判别式应用熟练','根系关系掌握好'];
+    P['函数基础'] = ['函数概念理解深刻','自变量取值范围考虑周全','函数图像识别快速','函数值计算准确','建模能力强'];
+    P['一次函数'] = ['斜率截距意义清晰','图像画法规范','解析式求法熟练','性质应用灵活','与方程不等式联系紧密'];
+    P['二次函数'] = ['顶点式一般式互化熟练','图像开口对称轴顶点准确','最值问题求解规范','建模能力强','与一元二次方程结合好'];
+    P['反比例函数'] = ['反比例意义清晰','图像性质掌握好','k的几何意义理解深','建模准确','与一次函数结合分析透'];
+    P['全等三角形'] = ['全等判定条件掌握全面','证明格式规范','辅助线构造巧妙','性质应用灵活','动态全等问题分析透'];
+    P['相似形'] = ['相似判定准确','相似比计算正确','性质应用熟练','位似图形理解好','比例线段灵活转换'];
+    P['勾股定理'] = ['勾股定理逆定理运用熟练','勾股数记忆准确','折叠问题方程建模好','最短路径问题分析透','构造直角三角形能力强'];
+    P['平行四边形'] = ['性质定理掌握好','判定定理运用灵活','对角线性质熟练','与三角形全等结合好','动态图形分析能力强'];
+    P['特殊的平行四边形'] = ['矩形菱形正方形性质区分清晰','判定条件运用准确','对称性理解深刻','折叠问题处理巧妙','综合证明逻辑严密'];
+    P['圆的基本性质'] = ['垂径定理运用熟练','圆心角圆周角关系清晰','弧弦圆心角对应准确','圆内接四边形性质掌握好','辅助圆思想灵活'];
+    P['欧姆定律'] = ['欧姆定律理解深刻','公式变形灵活运用','伏安法测电阻规范','动态电路分析到位','比例计算熟练'];
+    P['电功率'] = ['电功率概念清晰','公式选择恰当','额定实际功率区别清楚','电能表计算准确','家庭电路功率计算正确'];
+    P['数据分析'] = ['平均数众数中位数计算准确','方差标准差意义理解深','数据波动分析恰当','用样本估计总体思想好','统计图表信息提取快速'];
+    P['概率初步'] = ['概率意义理解深刻','列举法求概率完整','列表法树状图灵活','用频率估计概率实验规范','游戏公平性判断准'];
+    P['数学思想方法'] = ['分类讨论不重不漏','数形结合运用灵活','转化化归思想成熟','方程思想建模强','函数思想应用广泛'];
+    P['综合与实践'] = ['实际问题抽象能力强','方案选择分析全面','最优解求解规范','跨学科融合意识好','建模表达清晰'];
+
+    var N = {};
+    N['数与代数'] = ['计算粗心符号容易遗漏','运算顺序混淆','代数式变形不熟练','含参问题讨论不完整','估算能力偏弱'];
+    N['有理数运算'] = ['正负号容易出错','绝对值理解表面化','乘方底数指数混淆','简便运算技巧欠缺','数轴动态问题反应慢'];
+    N['实数与二次根式'] = ['平方根立方根记混','二次根式化简不规范','分母有理化易错','实数比较大小方法单一','无理数估值不准'];
+    N['整式乘除'] = ['幂的运算法则混淆','乘法公式结构不清','多项式除法步骤乱','合并同类项漏项','整体代入习惯差'];
+    N['因式分解'] = ['分解不彻底','公式法选错','十字相乘法不熟练','分组不合理','符号处理易错'];
+    N['分式与分式方程'] = ['分式有意义条件忽略','化简步骤跳步','去分母漏乘','增根检验遗漏','建模困难'];
+    N['一元一次方程'] = ['移项不变号','去分母漏乘常数项','步骤不规范','检验习惯差','等量关系找不准'];
+    N['二元一次方程组'] = ['消元方法选择不当','计算过程易错','含参讨论不清','列方程不准确','解的意义理解浅'];
+    N['一元二次方程'] = ['求根公式记错','配方法配方错误','因式分解不全','判别式应用忽视','根系关系使用不当','实际问题舍根不检验'];
+    N['函数基础'] = ['概念理解模糊','自变量取值范围易漏','函数值计算错误','图像识别慢','建模能力弱'];
+    N['一次函数'] = ['斜率截距意义不清','图像画法不规范','解析式求法不熟练','性质应用不灵活','与方程不等式联系弱'];
+    N['二次函数'] = ['顶点式一般式互化易错','图像性质判断失误','最值求解不规范','建模困难','综合题思路混乱'];
+    N['反比例函数'] = ['反比例意义理解浅','图像性质应用不熟','k的几何意义不会用','建模弱','与一次函数结合分析乱'];
+    N['全等三角形'] = ['判定条件选择不当','证明过程跳步严重','辅助线构造困难','性质应用不灵活','动态问题思路乱'];
+    N['相似形'] = ['相似判定条件混淆','相似比计算错误','性质应用不熟练','位似图形理解模糊','比例线段转换不灵活'];
+    N['勾股定理'] = ['定理逆定理混淆','勾股数记忆少','折叠问题方程列错','最短路径分析不清','构造不出直角三角形'];
+    N['平行四边形'] = ['性质定理记忆不牢','判定定理运用生疏','对角线性质用不好','与三角形全等结合弱'];
+    N['特殊的平行四边形'] = ['矩形菱形正方形性质区分不清','判定条件选错','对称性理解不到位','折叠处理乱','综合证明逻辑混乱'];
+    N['圆的基本性质'] = ['垂径定理应用不熟','圆心角圆周角关系记错','弧弦圆心角对应不准','圆内接四边形性质遗忘','辅助圆思想缺乏'];
+    N['数据分析'] = ['平均数众数中位数计算易错','方差标准差意义理解浅','波动分析不到位','样本估计总体信心不足'];
+    N['概率初步'] = ['概率意义理解不深刻','列举不完整','列表法树状图不规范','实验操作弱','公平性判断不准'];
+    N['数学思想方法'] = ['分类讨论有遗漏','数形结合运用生疏','转化化归意识弱','方程建模能力差','函数应用欠缺'];
+    N['综合与实践'] = ['抽象能力弱','方案分析不全面','最优解求解不规范','跨学科融合意识薄弱','表达不清'];
+
+    var S = {};
+    S['数与代数'] = ['数感逐渐增强','符号化表达日趋规范','抽象思维有明显进步','代数推理能力提升','运算耐力增强'];
+    S['方程与不等式'] = ['方程思想初步形成','化归意识增强','解方程规范性提高','建模能力进步','检验习惯逐渐养成'];
+    S['函数'] = ['函数观念逐步建立','数形结合意识提升','建模能力进步显著','动态思维发展','图像分析能力增强'];
+    S['图形与几何'] = ['空间观念发展迅速','逻辑推理能力进步','几何直观增强','画图能力提升','分类讨论意识形成'];
+    S['统计与概率'] = ['数据观念形成','随机意识增强','数据分析能力进步','信息提取能力提升','实际应用意识提高'];
+    S['综合实践'] = ['问题解决能力显著提升','合作交流意识增强','创新思维萌芽','反思总结习惯好','数学表达日趋清晰'];
+
+    var H = ['作业全对步骤规范','计算准确率高卷面整洁','错题订正及时反思深刻','应用题解答完整思路清晰','难题有钻研精神过程详细','书写潦草需工整','计算错误较多加强练习','过程跳步逻辑不连贯','应用题审题不清需读题训练','作业按时提交态度端正','预习任务完成认真','复习巩固做得扎实','草稿本使用不规范','符号书写易混淆加强训练'];
+    PS['数学'] = { L: L, P: P, N: N, S: S, H: H };
+})();
+
+// ---------- 英语 ----------
+(function() {
+    var L = ['词汇记忆与拼写','构词法','短语搭配积累','语法时态','语法语态','语法从句','语法非谓语动词','语法主谓一致','语法虚拟语气','语法倒装与强调','阅读理解细节理解','阅读理解主旨大意','阅读理解推理判断','阅读理解词义猜测','完形填空','七选五阅读','听力训练短对话','听力训练长对话','听力训练独白','书面表达应用文','书面表达读后续写','书面表达概要写作','情景交际','短文改错','语法填空','音标与拼读','英语国家文化','经典美文赏析','英语演讲与辩论','综合语言运用'];
+    var P = {};
+    P['词汇记忆与拼写'] = ['单词拼写准确率高','联想记忆法灵活','词根词缀运用熟练','一词多义掌握到位','词汇量显著扩大'];
+    P['构词法'] = ['派生词规律掌握好','转化法运用自如','合成词识别快速','前缀后缀理解深刻','猜词能力强'];
+    P['短语搭配积累'] = ['固定搭配记忆扎实','动词短语运用准确','介词短语使用恰当','短语辨析清晰','语境中使用得体'];
+    P['语法时态'] = ['各种时态结构清晰','时态意义理解深刻','时态呼应准确','语境中时态选择恰当','主动被动转换熟练'];
+    P['语法语态'] = ['被动语态构成熟练','主动表被动理解好','各种时态被动式灵活运用','被动语态意义把握准','短语动词被动处理正确'];
+    P['语法从句'] = ['从句引导词选用准确','从句语序正确','主从句时态呼应好','长难句分析能力强','从句简化熟练'];
+    P['语法非谓语动词'] = ['不定式用法清晰','动名词掌握扎实','分词用法灵活','非谓语逻辑主语判断准','独立主格结构理解好'];
+    P['语法主谓一致'] = ['就近原则运用熟练','意义一致判断准','语法一致规则清晰','复杂结构主谓不犯错','集体名词谓语选用正确'];
+    P['语法虚拟语气'] = ['if条件句虚拟熟练','名词性从句虚拟准确','含蓄虚拟理解好','虚拟语气特殊结构掌握','语感地道'];
+    P['语法倒装与强调'] = ['部分倒装结构正确','完全倒装运用灵活','强调句句型熟练','倒装强调表达丰富','避免中式语序'];
+    P['阅读理解细节理解'] = ['定位信息快速','题干关键词捕捉敏锐','原文依据找得准','排除法运用灵活','长难句细节不遗漏'];
+    P['阅读理解主旨大意'] = ['首尾段归纳能力强','主题句识别准确','段落大意概括精准','标题选择恰当','写作意图把握准'];
+    P['阅读理解推理判断'] = ['推断隐含意义合理','作者态度判断准确','写作目的分析到位','推断下文有依据','逻辑关系把握清晰'];
+    P['阅读理解词义猜测'] = ['上下文线索利用好','构词法推测能力强','同义反义替换准确','常识推理恰当','生词障碍克服快'];
+    P['完形填空'] = ['上下文联系紧密','固定搭配反应快','逻辑连贯性分析强','情感线索把握准','复现词汇识别灵敏'];
+    P['七选五阅读'] = ['语篇结构分析透','逻辑衔接词敏感','代词指代清晰','段落匹配准确','多余选项排除果断'];
+    P['听力训练短对话'] = ['关键词捕捉敏锐','数字时间反应快','场景判断准确','说话者意图把握准','简单推理正确'];
+    P['听力训练长对话'] = ['主旨大意把握准','细节信息获取全','人物关系判断清','态度观点分辨好','干扰项排除能力强'];
+    P['听力训练独白'] = ['话题转换跟上','关键数据记录快','演讲结构清晰','说话者目的理解深','隐含信息推得准'];
+    P['书面表达应用文'] = ['格式规范完整','要点齐全不漏','语言得体恰当','过渡自然流畅','卷面整洁美观'];
+    P['书面表达读后续写'] = ['原文情节理解深','续写逻辑连贯','语言风格一致','情感表达丰富','创意新颖合理'];
+    P['书面表达概要写作'] = ['主旨提炼精准','要点覆盖全面','语言简练规范','逻辑重组能力强','避免抄袭原文'];
+    P['情景交际'] = ['交际用语地道','礼貌表达恰当','文化差异意识强','应急回应快速','角色把握准确'];
+    P['短文改错'] = ['错误类型识别准','语法功底扎实','逻辑错误敏感','修改符号规范','改正后句子通顺'];
+    P['语法填空'] = ['语境提示利用好','词形转换熟练','连词选用准确','冠词介词不遗漏','动词形式判断快'];
+    P['音标与拼读'] = ['音标识读熟练','自然拼读规则掌握','重音语调自然','连读弱读地道','辨音能力强'];
+    P['英语国家文化'] = ['文化背景知识丰富','节日习俗了解多','思维方式理解深','跨文化交际意识强','文化对比清晰'];
+    P['经典美文赏析'] = ['文学修辞欣赏好','语言美感体会深','主题思想把握准','情感共鸣强烈','背诵模仿能力强'];
+    P['英语演讲与辩论'] = ['口语表达流利','逻辑论证严密','肢体语言自然','即兴反应快速','说服力强'];
+    P['综合语言运用'] = ['语言综合能力强','思维品质优秀','学习策略运用好','自主学习意识强','跨学科融合佳'];
+
+    var N = {};
+    N['词汇记忆与拼写'] = ['拼写易错字母颠倒','词义混淆语境用错','一词多义只知其一','固定搭配遗忘率高','词汇量增长慢'];
+    N['构词法'] = ['派生规则不熟','转化后词性不清','合成词理解困难','前缀后缀意义模糊','猜词能力弱'];
+    N['短语搭配积累'] = ['动词短语混淆','介词搭配错误','固定搭配张冠李戴','短语记忆机械','语境中不敢使用'];
+    N['语法时态'] = ['时态结构混淆','时间状语对应不清','主从句时态呼应乱','被动时态易错','进行时与一般时不分'];
+    N['语法语态'] = ['被动构成不熟练','主动表被动不会用','被动语态与系表结构混淆','短语动词被动出错','被动意义理解浅'];
+    N['语法从句'] = ['引导词选择错误','从句语序颠倒','主从句时态不一致','长难句分析困难','从句简化错误'];
+    N['语法非谓语动词'] = ['不定式符号遗漏','动名词与不定式混用','分词逻辑主语错','独立主格不会用','非谓语作状语出错'];
+    N['语法主谓一致'] = ['就近原则用错','意义一致判断失误','复杂主语后动词选错','集体名词主谓不清','there be句型出错'];
+    N['语法虚拟语气'] = ['if条件句动词形式错','名词性从句虚拟用错','含蓄虚拟不理解','特殊虚拟结构遗忘','语感生硬'];
+    N['语法倒装与强调'] = ['倒装结构词序错','部分倒装与完全倒装混','强调句句型错误','否定词前置不倒装','强调句判断失误'];
+    N['阅读理解细节理解'] = ['定位不准找错出处','题干关键词忽略','原文信息提取不全','排除法不会用','长难句读不懂'];
+    N['阅读理解主旨大意'] = ['首尾段不重视','主题句找错','段落大意偏颇','标题以偏概全','写作意图猜错'];
+    N['阅读理解推理判断'] = ['推断过度无依据','作者态度判断反','写作目的分析偏','下文预测不合理','逻辑关系混乱'];
+    N['阅读理解词义猜测'] = ['上下文线索不会用','构词法推测生硬','同义反义替换错误','常识乱用','放弃猜测'];
+    N['完形填空'] = ['上下文联系弱','固定搭配反应慢','逻辑词忽略','情感词抓不住','复现词识别不到'];
+    N['七选五阅读'] = ['语篇结构分析乱','逻辑衔接词忽略','代词指代不清','选项段落匹配错','纠结多余选项'];
+    N['听力训练短对话'] = ['关键词抓不住','数字时间反应慢','场景判断错误','意图把握不准','推理过度'];
+    N['听力训练长对话'] = ['主旨大意抓偏','细节信息遗漏多','人物关系判断错','态度观点听不出','干扰项易上当'];
+    N['听力训练独白'] = ['话题转换跟不上','关键数据记不住','演讲结构模糊','目的理解偏','隐含信息听不出'];
+    N['书面表达应用文'] = ['格式错误','要点遗漏','语言中式不地道','过渡生硬','卷面潦草'];
+    N['书面表达读后续写'] = ['情节理解偏差','续写逻辑断裂','语言风格不一','情感平淡','创意牵强'];
+    N['书面表达概要写作'] = ['主旨提炼偏','要点覆盖不全','语言冗长','逻辑重组乱','抄袭原文多'];
+    N['情景交际'] = ['交际用语生硬','礼貌表达欠缺','文化差异敏感度低','应急回应慢','角色把握失当'];
+    N['短文改错'] = ['错误类型识别弱','语法感知不足','逻辑错误发现不了','修改符号乱','改正后句子仍错'];
+    N['语法填空'] = ['语境提示忽视','词形转换错','连词瞎选','冠词介词乱填','动词形式判断失误'];
+    N['音标与拼读'] = ['音标识读困难','拼读规则混乱','重音常错','连读弱读生硬','辨音能力弱'];
+    N['英语国家文化'] = ['背景知识匮乏','节日习俗不知','思维方式不理解','跨文化交际障碍','文化对比空白'];
+    N['经典美文赏析'] = ['修辞手法看不出','语言美感体会浅','主题思想抓不住','情感共鸣缺乏','背诵模仿吃力'];
+    N['英语演讲与辩论'] = ['口语卡顿','逻辑漏洞多','肢体语言僵硬','即兴反应迟钝','说服力弱'];
+    N['综合语言运用'] = ['综合能力弱','思维品质欠佳','学习策略缺乏','自主学习意识差','跨学科融合困难'];
+
+    var S = {};
+    S['词汇与语法'] = ['词汇量稳步增长','语法体系逐渐完善','语言敏感度提升','语法错误减少','语感增强'];
+    S['阅读'] = ['阅读速度提高','长难句分析能力进步','信息获取效率高','推理判断能力增强','阅读耐力提升'];
+    S['听力'] = ['辨音能力进步','关键词捕捉更准','信息处理速度加快','听力理解正确率上升','听力耐力增强'];
+    S['写作'] = ['写作思路清晰','语言表达地道化','逻辑衔接更自然','卷面整洁度提升','语法错误减少'];
+    S['口语与交际'] = ['开口自信增强','语音语调改善','交际策略丰富','流利度提高','文化意识增强'];
+    S['综合语言运用'] = ['自主学习能力突出','资源利用意识强','反思习惯好','跨文化交际意愿高','语言综合素养提升'];
+
+    var H = ['单词听写全对','课文背诵流利','语法练习题正确率高','阅读理解完成认真','完形填空正确率提升','听力作业按时完成','作文书写工整语言地道','错题本整理规范','预习任务到位','复习巩固扎实','口语打卡积极','书写潦草需练字','作文中式表达多','阅读生词未查','听力作业敷衍'];
+    PS['英语'] = { L: L, P: P, N: N, S: S, H: H };
+})();
+
+// ---------- 物理 ----------
+(function() {
+    var L = ['机械运动与参照物','速度与平均速度','声现象','声音的特性','物态变化','光现象','光的反射定律','平面镜成像','光的折射','透镜及其应用','凸透镜成像规律','质量与密度','力与力的作用效果','重力','牛顿第一定律','二力平衡','摩擦力','压强','液体的压强','大气压强','浮力','阿基米德原理','物体的浮沉条件','功和功率','动能和势能','简单机械','杠杆','滑轮','机械效率','电流和电路','串联和并联','欧姆定律','电功率','家庭电路','电与磁'];
+    var P = {};
+    P['机械运动与参照物'] = ['参照物选择准确','运动相对性理解深刻','判断物体运动状态快速','实例分析正确','抽象概念具体化能力强'];
+    P['速度与平均速度'] = ['速度公式运用熟练','单位换算准确','平均速度计算规范','s-t图像分析透彻','测量实验操作规范'];
+    P['声现象'] = ['声音产生传播条件理解深','回声计算准确','双耳效应解释清楚','声速影响因素掌握好','超声波次声波应用了解多'];
+    P['声音的特性'] = ['音调响度音色区分清晰','波形图识别准确','乐器发声原理理解好','噪声控制途径明确','生活实例解释合理'];
+    P['物态变化'] = ['六种物态变化辨析准确','吸放热判断正确','常见现象解释清楚','晶体非晶体图像分析到位','水循环过程理解好'];
+    P['光现象'] = ['光源分类清楚','光的直线传播条件理解','小孔成像规律掌握','光速记忆准确','光年概念理解正确'];
+    P['光的反射定律'] = ['反射定律内容掌握牢固','作图规范标准','入射角反射角判断快','镜面反射漫反射区分好','光路可逆理解深'];
+    P['平面镜成像'] = ['成像特点规律记忆准','作图规范','像与物对称性理解好','虚实像区别清晰','实验探究步骤完整'];
+    P['光的折射'] = ['折射定律理解好','光路图绘制规范','折射现象解释合理','全反射初步了解','透镜作用理解好'];
+    P['透镜及其应用'] = ['凸凹透镜辨别准确','三条特殊光线作图熟练','透镜对光线作用理解好','生活中的透镜举例丰富','眼睛晶状体模型理解'];
+    P['凸透镜成像规律'] = ['成像规律记忆口诀熟练','物距像距关系清晰','应用实例对应准确','动态分析能力好','实验探究严谨'];
+    P['质量与密度'] = ['质量是物体属性理解深','天平使用规范','密度概念理解透','密度公式灵活运用','测量物质密度实验设计好'];
+    P['力与力的作用效果'] = ['力概念理解深刻','力的作用效果分析全面','力的三要素掌握','相互作用力判断准确','受力分析初步规范'];
+    P['重力'] = ['重力产生原因理解深','重力与质量关系掌握','g值意义清晰','重心概念理解','重力方向应用好'];
+    P['牛顿第一定律'] = ['牛顿第一定律理解深刻','惯性现象解释准确','理想实验法领会','力与运动关系辨析清楚','生活惯性实例丰富'];
+    P['二力平衡'] = ['平衡状态判断准确','二力平衡条件掌握','平衡力与相互作用力区别清晰','受力分析提高','平衡问题求解规范'];
+    P['摩擦力'] = ['摩擦力产生条件清楚','滑动摩擦力影响因素掌握','增大减小摩擦方法应用好','静摩擦力理解到位','实验探究控制变量法好'];
+    P['压强'] = ['压强概念理解深','压强公式灵活运用','增大减小压强方法举例恰当','柱体压强推导理解','生活压强实例分析正确'];
+    P['液体的压强'] = ['液体压强特点掌握','液体压强公式熟练应用','连通器原理理解','帕斯卡原理了解','生活应用举例丰富'];
+    P['大气压强'] = ['大气压存在实验理解','托里拆利实验原理清楚','大气压测量方法掌握','大气压变化规律了解','生活应用解释好'];
+    P['浮力'] = ['浮力概念理解深','浮力产生原因分析透','称重法测浮力操作规范','浮力方向判断准','生活浮力实例多'];
+    P['阿基米德原理'] = ['阿基米德原理理解深刻','浮力计算灵活','排开液体重力与浮力关系清','实验探究设计严谨','应用解题规范'];
+    P['物体的浮沉条件'] = ['浮沉条件判断准确','物体密度与液体密度比较熟练','浮沉应用实例丰富','轮船潜水艇原理理解','浮力综合题分析好'];
+    P['功和功率'] = ['功概念理解深','做功两个必要因素判断准','功计算公式应用正确','功率概念理解好','功率计算规范'];
+    P['动能和势能'] = ['动能影响因素掌握','势能影响因素理解','机械能概念清楚','动能势能转化实例分析正确','实验探究控制变量'];
+    P['简单机械'] = ['杠杆五要素识别准确','力臂作图规范','杠杆平衡条件熟练应用','滑轮组绕绳规范','机械效率计算正确'];
+    P['电流和电路'] = ['电荷概念清晰','电路组成理解好','通路断路短路判断准确','电路图绘制规范','实物图连接正确'];
+    P['串联和并联'] = ['串并联电路特点掌握','电流路径分析准确','开关作用判断正确','混联电路初步分析','实际电路设计合理'];
+    P['欧姆定律'] = ['欧姆定律理解深刻','公式变形灵活运用','伏安法测电阻规范','动态电路分析到位','比例计算熟练'];
+    P['电功率'] = ['电功率概念清晰','公式选择恰当','额定功率实际功率区别清楚','电能表计算准确','家庭电路功率计算正确'];
+    P['电与磁'] = ['磁极相互作用判断准','磁场方向理解','安培定则运用熟练','电磁铁特性掌握','电动机原理清楚'];
+
+    var N = {};
+    N['机械运动与参照物'] = ['参照物选择易错','运动相对性判断不清','物体运动状态描述不规范','单位换算错误','长度测量估读不准'];
+    N['速度与平均速度'] = ['速度公式乱用','单位换算经常错','平均速度理解成速度平均','s-t图像斜率分析错','测量实验操作不规范'];
+    N['声现象'] = ['声音产生传播条件理解浅','回声计算忘记除以2','双耳效应解释不清','声速影响因素记混','超声波次声波应用不知'];
+    N['声音的特性'] = ['音调响度音色混淆','波形图看不懂','乐器发声原理不清','噪声控制途径记不全','生活实例解释牵强'];
+    N['物态变化'] = ['物态变化名称记混','吸放热判断反','晶体非晶体图像分析困难','图像各段意义不清','水循环过程不熟'];
+    N['光现象'] = ['光源分类模糊','光直线传播条件忽略','小孔成像规律记混','光速数值记错','光年概念误解'];
+    N['光的反射定律'] = ['反射定律内容记忆不牢','作图法线漏画','入射角反射角找错','镜面反射漫反射区分不清','光路可逆应用弱'];
+    N['平面镜成像'] = ['成像特点规律记忆乱','作图对称点找错','像物虚实分不清','实验探究步骤遗漏','像距物距测量不准'];
+    N['光的折射'] = ['折射定律理解表面化','光路图方向画反','折射现象解释不清','全反射条件不知','透镜作用理解模糊'];
+    N['透镜及其应用'] = ['凸凹透镜辨别困难','三条特殊光线作图常错','透镜对光线作用记忆混','生活中的透镜举例少','眼睛晶状体模型理解差'];
+    N['凸透镜成像规律'] = ['成像规律口诀记混','物距像距关系混乱','应用实例对应不上','动态分析能力弱','实验探究步骤不规范'];
+    N['质量与密度'] = ['质量属性理解浅','天平使用步骤乱','密度概念理解表面','密度公式变形不熟','测量实验误差分析弱'];
+    N['力与力的作用效果'] = ['力概念理解不深','力的作用效果分析不全','力的三要素掌握不牢','相互作用力判断易错','受力分析不规范'];
+    N['重力'] = ['重力产生原因理解浅','G=mg公式变形不熟','g值意义不清','重心找不准','重力方向应用易错'];
+    N['牛顿第一定律'] = ['定律理解表面','惯性现象解释牵强','理想实验法领会差','力与运动关系混淆','生活惯性实例举例少'];
+    N['二力平衡'] = ['平衡状态判断不准','平衡条件记忆不全','平衡力与相互作用力混淆','受力分析漏力','平衡问题求解乱'];
+    N['摩擦力'] = ['摩擦力产生条件不清','影响因素探究控制变量乱','增大减小摩擦方法应用不当','静摩擦力方向判断难','实验操作不规范'];
+    N['压强'] = ['压强概念理解浅','公式使用单位不统一','增大减小压强方法举例不当','柱体压强推导不懂','生活实例分析错误'];
+    N['液体的压强'] = ['液体压强特点记忆不牢','公式h深度理解错','连通器原理应用弱','帕斯卡原理不知','生活应用举例少'];
+    N['大气压强'] = ['大气压存在实验理解浅','托里拆利实验原理不清','大气压测量方法不知','大气压变化规律记混','生活应用解释不清'];
+    N['浮力'] = ['浮力概念理解表面','浮力产生原因分析不清','称重法测浮力步骤乱','浮力方向判断错','生活浮力实例少'];
+    N['阿基米德原理'] = ['原理理解表面','浮力计算乱代公式','排开液体重力与浮力关系不清','实验探究步骤乱','综合题无从下手'];
+    N['物体的浮沉条件'] = ['浮沉条件判断易错','密度比较乱','浮沉应用实例少','轮船潜水艇原理理解浅','浮力综合题分析乱'];
+    N['功和功率'] = ['功概念理解浅','做功两个必要因素判断不准','功计算公式单位用错','功率概念理解表面','功率计算常错'];
+    N['动能和势能'] = ['动能影响因素记忆不全','势能影响因素理解浅','机械能概念模糊','动能势能转化分析乱','实验探究控制变量弱'];
+    N['简单机械'] = ['杠杆五要素识别不准','力臂作图常错','杠杆平衡条件应用不熟','滑轮组绕绳不规范','机械效率计算乱'];
+
+    var S = {};
+    S['力学基础'] = ['受力分析意识逐步形成','力的概念理解加深','平衡状态判断能力提升','惯性现象解释趋于合理','实验探究兴趣浓厚'];
+    S['压强与浮力'] = ['压强概念初步建立','液体压强特点掌握','大气压应用联系生活','浮力认识逐渐深入','阿基米德原理理解进步'];
+    S['简单机械'] = ['杠杆识别能力增强','滑轮组绕绳逐渐规范','机械效率理解加深','功和功率计算准确率提高','机械能转化分析能力提升'];
+    S['声与光'] = ['声音特性辨析能力提高','光现象解释更合理','反射定律作图规范','凸透镜成像规律记忆清晰','光学实验操作熟练'];
+    S['热学'] = ['物态变化辨析准确','温度计使用规范','晶体熔化图像分析能力提升','汽化液化现象解释正确','热传递理解加深'];
+    S['电学基础'] = ['电路识别能力增强','电流电压测量规范','欧姆定律应用逐步熟练','电功率计算准确率提高','家庭电路安全意识强'];
+
+    var H = ['作业完成认真步骤规范','计算题过程详细单位规范','实验报告完整数据分析到位','错题订正及时反思深刻','预习任务完成','复习巩固扎实','作图题规范','简答题表述准确','计算粗心单位遗漏','公式记混应用不熟练','受力分析漏力'];
+    PS['物理'] = { L: L, P: P, N: N, S: S, H: H };
+})();
+
+// 初始化 subData
+for (var sub in PS) {
+    subData[sub] = {
+        selL: [], selP: [], selN: [], selS: [], selH: [],
+        uP: [], uN: [],
+        es: ['teaching_review','highlights','improvement_space','learning_status','suggestions','homework_notes'],
+        cs: [],
+        fc: { sn: '', lc: '', pc: '', nc: '', sc: '', hc: '', tc: '', im: '' }
+    };
+}
+
+// ============================================================
+// 班级渲染
+// ============================================================
+function rCS() { var s = document.getElementById('classSelect'); s.innerHTML = '<option value="">--选择班级--</option>'; classesData.forEach(function(c) { var o = document.createElement('option'); o.value = c.id; o.textContent = c.name; if (c.id === curClassId) o.selected = true; s.appendChild(o); }); }
+function rSP() { var cls = classesData.find(function(c) { return c.id === curClassId; }); var c = document.getElementById('studentNamePresets'); c.innerHTML = ''; if (!cls || !cls.students.length) { c.innerHTML = '<span class="text-xs text-slate-400">暂无学生</span>'; return; } cls.students.forEach(function(s) { var t = document.createElement('span'); t.className = 'preset-tag px-2 py-1 rounded-full text-xs border bg-slate-50'; t.textContent = s; t.onclick = function() { document.getElementById('studentNameInput').value = s; saveFC(); }; c.appendChild(t); }); }
+
+// ============================================================
+// 预设渲染
+// ============================================================
+function rLP() {
+    var c = document.getElementById('lessonPresets'), p = PS[curSubject];
+    if (!p || !p.L) { c.innerHTML = '<span class="text-xs text-slate-400">暂无课程</span>'; return; }
+    var d = sd(); c.innerHTML = '';
+    p.L.forEach(function(item) {
+        var t = document.createElement('span'), sel = d.selL.indexOf(item) >= 0;
+        t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-slate-50' + (sel ? ' selected' : '');
+        t.textContent = item;
+        t.onclick = function() { var i = d.selL.indexOf(item); if (i >= 0) d.selL.splice(i, 1); else d.selL.push(item); rLP(); rPN(); saveSub(); };
+        c.appendChild(t);
+    });
+}
+
+function rPN() {
+    var d = sd(), p = PS[curSubject]; if (!p) return;
+    var pm = p.P || {}, nm = p.N || {}, ap = {}, an = {};
+    d.selL.forEach(function(l) { if (pm[l]) pm[l].forEach(function(x) { ap[x] = 1; }); if (nm[l]) nm[l].forEach(function(x) { an[x] = 1; }); });
+    if (pm['通用']) pm['通用'].forEach(function(x) { ap[x] = 1; });
+    if (nm['通用']) nm['通用'].forEach(function(x) { an[x] = 1; });
+    d.uP.forEach(function(x) { ap[x] = 1; }); d.uN.forEach(function(x) { an[x] = 1; });
+
+    var pc = document.getElementById('positivePerformancePresets'), nc = document.getElementById('negativePerformancePresets');
+    pc.innerHTML = ''; Object.keys(ap).forEach(function(item) { var t = document.createElement('span'), sel = d.selP.indexOf(item) >= 0; t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-emerald-50 text-emerald-700' + (sel ? ' selected' : ''); t.textContent = item; t.onclick = function() { var i = d.selP.indexOf(item); if (i >= 0) d.selP.splice(i, 1); else d.selP.push(item); rPN(); saveSub(); }; pc.appendChild(t); });
+    if (Object.keys(ap).length === 0) pc.innerHTML = '<span class="text-xs text-slate-400">请先选择上课内容，标签将自动匹配</span>';
+
+    nc.innerHTML = ''; Object.keys(an).forEach(function(item) { var t = document.createElement('span'), sel = d.selN.indexOf(item) >= 0; t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-amber-50 text-amber-700 negative' + (sel ? ' selected' : ''); t.textContent = item; t.onclick = function() { var i = d.selN.indexOf(item); if (i >= 0) d.selN.splice(i, 1); else d.selN.push(item); rPN(); saveSub(); }; nc.appendChild(t); });
+    if (Object.keys(an).length === 0) nc.innerHTML = '<span class="text-xs text-slate-400">请先选择上课内容，标签将自动匹配</span>';
+}
+
+function rSS() {
+    var c = document.getElementById('statusPresets'), p = PS[curSubject];
+    if (!p || !p.S) { c.innerHTML = ''; return; }
+    var d = sd(), all = {}; Object.keys(p.S).forEach(function(k) { p.S[k].forEach(function(s) { all[s] = 1; }); });
+    c.innerHTML = ''; Object.keys(all).forEach(function(item) { var t = document.createElement('span'), sel = d.selS.indexOf(item) >= 0; t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-slate-50' + (sel ? ' selected' : ''); t.textContent = item; t.onclick = function() { var i = d.selS.indexOf(item); if (i >= 0) d.selS.splice(i, 1); else d.selS.push(item); rSS(); saveSub(); }; c.appendChild(t); });
+}
+
+function rHP() {
+    var c = document.getElementById('homeworkPresets'), p = PS[curSubject];
+    if (!p || !p.H) { c.innerHTML = ''; return; }
+    var d = sd(); c.innerHTML = '';
+    p.H.forEach(function(item) { var t = document.createElement('span'), sel = d.selH.indexOf(item) >= 0; t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-slate-50' + (sel ? ' selected' : ''); t.textContent = item; t.onclick = function() { var i = d.selH.indexOf(item); if (i >= 0) d.selH.splice(i, 1); else d.selH.push(item); rHP(); saveSub(); }; c.appendChild(t); });
+}
+
+function rSC() {
+    var d = sd(), c = document.getElementById('sectionsChecklist');
+    var sec = [{ id: 'teaching_review', name: '📖 教学内容回顾' },{ id: 'highlights', name: '✨ 课堂亮点' },{ id: 'improvement_space', name: '📈 待提升空间' },{ id: 'learning_status', name: '📊 学习状态分析' },{ id: 'suggestions', name: '💡 提升建议' },{ id: 'homework_notes', name: '📝 作业与寄语' }];
+    c.innerHTML = ''; sec.forEach(function(s) { var l = document.createElement('label'); l.className = 'flex items-center gap-1.5 text-sm cursor-pointer'; var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = s.id; cb.checked = d.es.indexOf(s.id) >= 0; cb.onchange = function() { if (cb.checked) d.es.push(s.id); else d.es = d.es.filter(function(x) { return x !== s.id; }); saveSub(); }; l.appendChild(cb); l.appendChild(document.createTextNode(s.name)); c.appendChild(l); });
+    var cc = document.getElementById('customSectionsContainer'); cc.innerHTML = '';
+    d.cs.forEach(function(cs, idx) { var div = document.createElement('div'); div.className = 'custom-block-item p-2 rounded-lg'; div.innerHTML = '<div class="flex justify-between items-center"><input value="' + esc(cs.title) + '" placeholder="板块标题" class="text-sm font-semibold border-b px-2 py-1 w-2/3"><button class="text-xs text-red-400" data-idx="' + idx + '">✕</button></div><textarea placeholder="AI引导语（可选）" class="w-full mt-1 text-xs border rounded-lg p-1">' + esc(cs.guidance || '') + '</textarea>'; div.querySelector('input').oninput = function(e) { cs.title = e.target.value; saveSub(); }; div.querySelector('textarea').oninput = function(e) { cs.guidance = e.target.value; saveSub(); }; div.querySelector('button').onclick = function() { d.cs.splice(idx, 1); rSC(); saveSub(); }; cc.appendChild(div); });
+}
+
+// ============================================================
+// 学科切换 / 清空
+// ============================================================
+function swSub(sub) { saveFC(); curSubject = sub; document.querySelectorAll('.subject-tab').forEach(function(t) { t.classList.remove('active'); }); var tab = document.querySelector('.subject-tab[data-subject="' + sub + '"]'); if (tab) tab.classList.add('active'); loadFC(); rLP(); rPN(); rSS(); rHP(); rSC(); }
+function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; d.fc = { sn: '', lc: '', pc: '', nc: '', sc: '', hc: '', tc: '', im: '' }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空'); }
+
+// ============================================================
+// AI 生成
+// ============================================================
+function buildPrompt() {
+    var d = sd();
+    var secs = [{ id: 'teaching_review', name: '教学内容回顾' },{ id: 'highlights', name: '课堂亮点' },{ id: 'improvement_space', name: '待提升空间' },{ id: 'learning_status', name: '学习状态分析' },{ id: 'suggestions', name: '提升建议' },{ id: 'homework_notes', name: '作业与寄语' }].filter(function(s) { return d.es.indexOf(s.id) >= 0; }).map(function(s) { return s.name; });
+    var cust = d.cs.map(function(c) { return '【' + c.title + '】'; });
+    var all = secs.concat(cust);
+    var sm = { formal: '请使用正式严谨的语言，适当引用教学理论', friendly: '请使用亲切温和的语气，像朋友交流一样', brief: '请言简意赅直击要点避免冗余', literary: '请使用优美典雅的文字富有文学气息' };
+    return '你是资深' + curSubject + '教学专家。为家长撰写课后反馈。' + sm[curStyle] + '。纯文本，禁止Markdown。板块标题用【】包裹：' + all.join(' → ') + '。字数约' + wordCount + '字。学生：' + (d.fc.sn || '未指定') + '，上课内容：' + (d.selL.concat([d.fc.lc]).filter(Boolean).join('；') || '未指定') + '，课堂亮点：' + (d.selP.concat([d.fc.pc]).filter(Boolean).join('；') || '无') + '，待提升：' + (d.selN.concat([d.fc.nc]).filter(Boolean).join('；') || '无') + '，学习状态：' + (d.selS.concat([d.fc.sc]).filter(Boolean).join('；') || '无') + '，作业：' + (d.selH.concat([d.fc.hc]).filter(Boolean).join('；') || '无') + '。教师补充：' + (d.fc.tc || '无') + '。仿写参考：' + (d.fc.im || '无') + '。';
+}
+
+async function handleGen() {
+    if (generating) return; var d = sd();
+    if (!d.fc.sn && d.selL.length === 0) { toast('请至少填写学生姓名或选择上课内容', 'error'); return; }
+    if (getCr() < 1) { toast('次数不足！请点击上方「💰 充值」', 'error'); return; }
+    generating = true; var sp = document.getElementById('genSpinner'), btn = document.getElementById('generateBtn');
+    sp.classList.remove('hidden'); btn.disabled = true;
+    document.getElementById('resultPlaceholder').classList.add('hidden'); document.getElementById('resultLoading').classList.remove('hidden');
+    document.getElementById('resultError').classList.add('hidden'); document.getElementById('resultContent').classList.add('hidden');
+    document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true;
+    try {
+        var prompt = buildPrompt();
+        var resp = await sb.functions.invoke('generate-feedback', { body: { prompt: prompt, model: 'deepseek' } });
+        if (resp.error) throw new Error(resp.error.message || '调用失败');
+        var data = resp.data;
+        if (data && data.error) throw new Error(data.error);
+        if (!data || !data.content) throw new Error('AI 返回为空');
+        genText = data.content; useCr();
+        document.getElementById('resultLoading').classList.add('hidden'); document.getElementById('resultContent').classList.remove('hidden');
+        document.getElementById('resultContent').textContent = genText;
+        document.getElementById('copyResultBtn').disabled = false; document.getElementById('downloadResultBtn').disabled = false;
+        document.getElementById('creditBalance').innerText = getCr();
+        toast('生成成功！剩余 ' + getCr() + ' 次', 'success');
+    } catch (e) {
+        document.getElementById('resultLoading').classList.add('hidden'); document.getElementById('resultError').classList.remove('hidden');
+        document.getElementById('resultError').textContent = '生成失败：' + e.message; toast('生成失败：' + e.message, 'error');
+    } finally { generating = false; sp.classList.add('hidden'); btn.disabled = false; }
+}
+
+// ============================================================
+// 充值
+// ============================================================
+async function redeemCode(code) {
+    try {
+        var resp = await sb.rpc('redeem_code', { code_str: code });
+        if (resp.error) { toast('充值失败：' + resp.error.message, 'error'); return false; }
+        var data = resp.data;
+        // RPC 返回 TABLE，data 是数组 [{success, added, message}]
+        if (data && data.length > 0 && data[0].success) {
+            addCr(data[0].added);
+            toast(data[0].message + '，当前共 ' + getCr() + ' 次', 'success');
+            return true;
+        } else {
+            toast(data && data.length > 0 ? data[0].message : '兑换失败', 'error');
+            return false;
+        }
+    } catch (e) { toast('兑换失败：' + e.message, 'error'); return false; }
+}
+
+// ============================================================
+// 作业批改
+// ============================================================
+async function analyzeHw() {
+    if (hwImages.length === 0) { toast('请先拍照或上传作业图片', 'error'); return; }
+    if (getCr() < 1) { toast('次数不足', 'error'); return; }
+    var btn = document.getElementById('startHomeworkAnalysisBtn'); btn.disabled = true; btn.textContent = '⏳ AI 分析中…';
+    document.getElementById('hwAnalysisResultArea').classList.add('hidden');
+    try {
+        var subject = curSubject, ans = document.getElementById('homeworkAnswerText').value;
+        var prompt = '请批改以下' + subject + '作业。' + (ans ? '参考答案：' + ans : '') + '请指出对错、评分和改进建议。';
+        var resp = await sb.functions.invoke('generate-feedback', { body: { prompt: prompt, model: 'deepseek' } });
+        if (resp.error) throw new Error(resp.error.message);
+        var data = resp.data;
+        if (data && data.error) throw new Error(data.error);
+        document.getElementById('hwAnalysisResultContent').textContent = data.content;
+        document.getElementById('hwAnalysisResultArea').classList.remove('hidden');
+        useCr(); document.getElementById('creditBalance').innerText = getCr();
+        toast('批改完成！剩余 ' + getCr() + ' 次', 'success');
+    } catch (e) { toast('批改失败：' + e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = '🤖 AI 分析作业 (消耗1次)'; }
+}
+
+// ============================================================
+// 班级管理
+// ============================================================
+function rCLM() {
+    var c = document.getElementById('classListInModal'); c.innerHTML = '';
+    classesData.forEach(function(cls) { var d = document.createElement('div'); d.className = 'flex justify-between items-center py-1 px-2 rounded cursor-pointer ' + (cls.id === curClassId ? 'bg-indigo-100' : 'hover:bg-slate-100'); d.innerHTML = '<span class="text-sm">' + cls.name + '</span><button class="text-xs text-red-400">🗑️</button>'; d.querySelector('span').onclick = function() { curClassId = cls.id; rCLM(); rSLM(); document.getElementById('modalClassName').textContent = ' - ' + cls.name; }; d.querySelector('button').onclick = function(e) { e.stopPropagation(); if (!confirm('确定删除？')) return; classesData = classesData.filter(function(x) { return x.id !== cls.id; }); if (curClassId === cls.id) curClassId = classesData.length > 0 ? classesData[0].id : null; saveCls(); rCLM(); rSLM(); rCS(); rSP(); }; c.appendChild(d); });
+    rSLM(); if (curClassId) { var cls = classesData.find(function(x) { return x.id === curClassId; }); if (cls) document.getElementById('modalClassName').textContent = ' - ' + cls.name; }
+}
+function rSLM() {
+    var c = document.getElementById('studentListInModal'), cls = classesData.find(function(x) { return x.id === curClassId; });
+    if (!cls) { c.innerHTML = '<p class="text-xs text-slate-400">请选择一个班级</p>'; document.getElementById('studentCountInModal').textContent = ''; return; }
+    document.getElementById('studentCountInModal').textContent = '共 ' + cls.students.length + ' 人'; c.innerHTML = '';
+    cls.students.forEach(function(s, idx) { var d = document.createElement('div'); d.className = 'flex justify-between items-center border-b py-1'; d.innerHTML = '<span class="text-sm cursor-pointer hover:text-indigo-600">' + s + '</span><button class="text-xs text-red-400">✕</button>'; d.querySelector('span').onclick = function() { var n = prompt('修改姓名：', s); if (n && n.trim()) { cls.students[idx] = n.trim(); saveCls(); rSLM(); rSP(); } }; d.querySelector('button').onclick = function() { cls.students.splice(idx, 1); saveCls(); rSLM(); rSP(); }; c.appendChild(d); });
+}
+
+// ============================================================
+// 相机 / OCR
+// ============================================================
+var camStream = null, camFacing = 'environment';
+function openCam() { document.getElementById('cameraModal').classList.remove('hidden'); startCam('cameraVideo'); }
+function startCam(vid) { try { if (camStream) camStream.getTracks().forEach(function(t) { t.stop(); }); camStream = navigator.mediaDevices.getUserMedia({ video: { facingMode: camFacing, width: { ideal: 1280 }, height: { ideal: 720 } } }); camStream.then(function(s) { document.getElementById(vid).srcObject = s; }).catch(function() {}); } catch (e) { toast('无法访问摄像头', 'error'); } }
+function closeCam() { if (camStream) { camStream.then(function(s) { s.getTracks().forEach(function(t) { t.stop(); }); }); camStream = null; } document.getElementById('cameraModal').classList.add('hidden'); }
+function swCam() { camFacing = camFacing === 'environment' ? 'user' : 'environment'; startCam('cameraVideo'); }
+function captureOCR() {
+    var v = document.getElementById('cameraVideo'), c = document.getElementById('cameraCanvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
+    document.getElementById('ocrLoading').classList.remove('hidden');
+    Tesseract.recognize(c, 'chi_sim+eng').then(function(r) {
+        document.getElementById('ocrLoading').classList.add('hidden'); document.getElementById('ocrResultArea').classList.remove('hidden');
+        var names = r.data.text.match(/[一-鿿]{2,4}/g) || []; names = Array.from(new Set(names)).filter(function(n) { return n.length >= 2 && n.length <= 4; });
+        var cont = document.getElementById('recognizedNamesList'); cont.innerHTML = '';
+        names.forEach(function(n) { var t = document.createElement('span'); t.className = 'preset-tag px-2 py-1 rounded-full text-xs border bg-indigo-50'; t.textContent = n; t.style.cursor = 'pointer'; t.onclick = function() { t.classList.toggle('selected'); }; cont.appendChild(t); });
+        document.getElementById('addRecognizedNamesBtn').onclick = function() {
+            var cls = classesData.find(function(x) { return x.id === curClassId; }); if (!cls) { toast('请先选择班级', 'error'); return; }
+            var sel = cont.querySelectorAll('.selected'); sel.forEach(function(t) { if (cls.students.indexOf(t.textContent) < 0) cls.students.push(t.textContent); });
+            saveCls(); rSLM(); rSP(); document.getElementById('ocrResultArea').classList.add('hidden'); toast('已添加 ' + sel.length + ' 名学生', 'success');
+        };
+    }).catch(function(e) { document.getElementById('ocrLoading').classList.add('hidden'); toast('识别失败：' + e.message, 'error'); });
+}
+
+// ============================================================
+// 作业拍照
+// ============================================================
+var hwStream = null, hwF = 'environment';
+function openHwCam() { try { if (hwStream) hwStream.getTracks().forEach(function(t) { t.stop(); }); hwStream = navigator.mediaDevices.getUserMedia({ video: { facingMode: hwF, width: { ideal: 1280 }, height: { ideal: 720 } } }); hwStream.then(function(s) { document.getElementById('hwVideo').srcObject = s; }).catch(function() {}); } catch (e) {} }
+function stopHwCam() { if (hwStream) { hwStream.then(function(s) { s.getTracks().forEach(function(t) { t.stop(); }); }); hwStream = null; } }
+function swHwCam() { hwF = hwF === 'environment' ? 'user' : 'environment'; openHwCam(); }
+function capHw() { var v = document.getElementById('hwVideo'), c = document.getElementById('hwCanvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0); c.toBlob(function(b) { hwImages.push(b); rIL(); }, 'image/jpeg', 0.85); }
+function handleFU(e) { var files = e.target.files; if (!files) return; for (var i = 0; i < files.length; i++) { if (files[i].type.indexOf('image/') === 0) hwImages.push(files[i]); } rIL(); e.target.value = ''; }
+function rIL() { var c = document.getElementById('imageList'); c.innerHTML = ''; hwImages.forEach(function(img, idx) { var url = URL.createObjectURL(img), d = document.createElement('div'); d.className = 'image-list-item'; d.innerHTML = '<img src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;"><span class="remove-img">❌</span>'; d.querySelector('.remove-img').onclick = function() { hwImages.splice(idx, 1); rIL(); URL.revokeObjectURL(url); }; c.appendChild(d); }); }
+
+// ============================================================
+// 初始化
+// ============================================================
+function init() {
+    document.getElementById('creditBalance').innerText = getCr();
+
+    // 学科 Tab
+    var tc = document.getElementById('subjectTabs');
+    Object.keys(PS).forEach(function(sub) { var s = document.createElement('span'); s.className = 'subject-tab' + (sub === curSubject ? ' active' : ''); s.dataset.subject = sub; s.textContent = sub; s.onclick = function() { swSub(sub); }; tc.appendChild(s); });
+
+    loadSub(); loadCls(); loadFC();
+    rCS(); rSP(); rLP(); rPN(); rSS(); rHP(); rSC();
+
+    // 样式按钮
+    document.querySelectorAll('.style-btn').forEach(function(b) { b.onclick = function() { document.querySelectorAll('.style-btn').forEach(function(x) { x.classList.remove('active'); }); b.classList.add('active'); curStyle = b.dataset.style; }; });
+    document.getElementById('wordCountSelect').onchange = function() { wordCount = parseInt(this.value); };
+
+    // 文本框计数
+    ['lessonCustom','positiveCustom','negativeCustom','statusCustom','homeworkCustom','teacherCustomNote','imitateStyleInput'].forEach(function(id) { var el = document.getElementById(id); if (el) el.oninput = function() { cc(); saveFC(); }; });
+    document.getElementById('studentNameInput').oninput = function() { saveFC(); };
+
+    // 班级 + 清空 + 生成
+    document.getElementById('classSelect').onchange = function() { curClassId = this.value; rSP(); };
+    document.getElementById('generateBtn').onclick = handleGen;
+    document.getElementById('clearFormBtn').onclick = clrForm;
+
+    // 添加自定义亮点/待提升
+    document.getElementById('addPositiveCustomBtn').onclick = function() { var v = document.getElementById('newPositiveInput').value.trim(); if (!v) return; var d = sd(); d.uP.push(v); d.selP.push(v); document.getElementById('newPositiveInput').value = ''; saveSub(); rPN(); };
+    document.getElementById('addNegativeCustomBtn').onclick = function() { var v = document.getElementById('newNegativeInput').value.trim(); if (!v) return; var d = sd(); d.uN.push(v); d.selN.push(v); document.getElementById('newNegativeInput').value = ''; saveSub(); rPN(); };
+
+    // 自定义板块
+    document.getElementById('addCustomSectionBtn').onclick = function() { var d = sd(); d.cs.push({ title: '新板块', guidance: '' }); saveSub(); rSC(); };
+
+    // 复制 / 下载
+    document.getElementById('copyResultBtn').onclick = function() { navigator.clipboard.writeText(genText).then(function() { toast('已复制到剪贴板', 'success'); }); };
+    document.getElementById('downloadResultBtn').onclick = function() { var blob = new Blob([genText], { type: 'text/plain;charset=utf-8' }); var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '课后反馈_' + new Date().toISOString().slice(0, 10) + '.txt'; a.click(); toast('下载完成', 'success'); };
+
+    // 充值
+    document.getElementById('showRechargeBtn').onclick = function() { document.getElementById('rechargeModal').classList.remove('hidden'); };
+    document.getElementById('closeRechargeBtn').onclick = function() { document.getElementById('rechargeModal').classList.add('hidden'); };
+    document.getElementById('submitRechargeBtn').onclick = function() { var code = document.getElementById('rechargeCodeInput').value.trim(); if (!code) { toast('请输入充值码', 'error'); return; } redeemCode(code).then(function(ok) { if (ok) { document.getElementById('rechargeModal').classList.add('hidden'); document.getElementById('rechargeCodeInput').value = ''; } }); };
+    document.getElementById('rechargeCodeInput').onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('submitRechargeBtn').click(); };
+
+    // 班级管理
+    document.getElementById('openClassModalBtn').onclick = function() { rCLM(); document.getElementById('classModalOverlay').classList.remove('hidden'); };
+    document.getElementById('closeClassModalBtn').onclick = function() { document.getElementById('classModalOverlay').classList.add('hidden'); };
+    document.getElementById('doneClassModalBtn').onclick = function() { document.getElementById('classModalOverlay').classList.add('hidden'); rCS(); rSP(); };
+    document.getElementById('addClassBtn').onclick = function() { var n = prompt('请输入新班级名称：'); if (n && n.trim()) { classesData.push({ id: 'c' + Date.now(), name: n.trim(), students: [] }); saveCls(); rCLM(); } };
+    document.getElementById('addStudentBtn').onclick = function() { var n = document.getElementById('newStudentInput').value.trim(); if (!n) return; var cls = classesData.find(function(c) { return c.id === curClassId; }); if (cls) { cls.students.push(n); saveCls(); rSLM(); document.getElementById('newStudentInput').value = ''; } };
+    document.getElementById('cameraRecognizeBtn').onclick = openCam;
+    document.getElementById('closeCameraModal').onclick = closeCam;
+    document.getElementById('capturePhotoBtn').onclick = captureOCR;
+    document.getElementById('switchCameraBtn').onclick = swCam;
+
+    // 作业分析
+    document.getElementById('openHomeworkAnalysisBtn').onclick = function() { document.getElementById('hwAnalysisModal').classList.remove('hidden'); openHwCam(); };
+    document.getElementById('closeHwModal').onclick = function() { document.getElementById('hwAnalysisModal').classList.add('hidden'); stopHwCam(); };
+    document.getElementById('captureHwPhotoBtn').onclick = capHw;
+    document.getElementById('switchHwCameraBtn').onclick = swHwCam;
+    document.getElementById('startHomeworkAnalysisBtn').onclick = analyzeHw;
+    document.getElementById('uploadHwImage').onchange = handleFU;
+    document.getElementById('provideAnswerCheckbox').onchange = function() { document.getElementById('answerInputDiv').classList.toggle('hidden', !this.checked); };
+    document.getElementById('applyToHomeworkBtn').onclick = function() { document.getElementById('homeworkCustom').value = document.getElementById('hwAnalysisResultContent').textContent; cc(); saveFC(); toast('已应用', 'success'); };
+    document.getElementById('applyToNoteBtn').onclick = function() { document.getElementById('teacherCustomNote').value = document.getElementById('hwAnalysisResultContent').textContent; cc(); saveFC(); toast('已应用', 'success'); };
+
+    // 遮罩关闭
+    document.querySelectorAll('[id$="Modal"], [id$="ModalOverlay"]').forEach(function(el) { if (el) el.onclick = function(e) { if (e.target === this) this.classList.add('hidden'); }; });
+
+    toast('👋 欢迎使用！新设备赠送 5 次免费次数', 'info');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
+</html>

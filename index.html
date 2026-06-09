@@ -651,7 +651,7 @@ function buildPrompt() {
     var secs = [{ id: 'teaching_review', name: '教学内容回顾' },{ id: 'highlights', name: '课堂亮点' },{ id: 'improvement_space', name: '待提升空间' },{ id: 'learning_status', name: '学习状态分析' },{ id: 'suggestions', name: '提升建议' },{ id: 'homework_notes', name: '作业与寄语' }].filter(function(s) { return d.es.indexOf(s.id) >= 0; }).map(function(s) { return s.name; });
     var cust = d.cs.map(function(c) { return '【' + c.title + '】'; });
     var all = secs.concat(cust);
-    var sm = { formal: '请使用正式严谨的语言，适当引用教学理论', friendly: '请使用亲切温和的语气，像朋友交流一样', brief: '请言简意赅直击要点避免冗余', literary: '请使用优美典雅的文字富有文学气息' };
+    var sm = { formal: '【写作风格：正式严谨】你是一份面向学校的正式教学报告。使用第三人称（该生/同学），措辞客观有据，避免口语和感叹号，结构清晰完整，如学校官方评语。', friendly: '【写作风格：亲切温雅】你是一位温柔的老师在跟家长当面沟通。语气温暖如聊天，多用"我们XX同学""可以试试""不妨"等亲切表达，肯定和鼓励先行，建议委婉，结尾传递信心。', brief: '【写作风格：干练精准】用最少的话传达最多的信息。每个板块控制在2-3句以内，去掉所有修饰词和套话，不写排比句，直击核心，让家长30秒读完即懂。', literary: '【写作风格：文艺书香】用散文般的笔触书写，富有文学气息但不过度华丽。适当化用成语或古诗词意境，句子长短错落有致，让反馈读来如沐春风。' };
     return '你是资深' + curSubject + '教学专家。为家长撰写课后反馈。' + sm[curStyle] + '。纯文本，禁止Markdown。板块标题用【】包裹：' + all.join(' → ') + '。字数约' + wordCount + '字。学生：' + (d.fc.sn || '未指定') + '，上课内容：' + (d.selL.concat([d.fc.lc]).filter(Boolean).join('；') || '未指定') + '，课堂亮点：' + (d.selP.concat([d.fc.pc]).filter(Boolean).join('；') || '无') + '，待提升：' + (d.selN.concat([d.fc.nc]).filter(Boolean).join('；') || '无') + '，学习状态：' + (d.selS.concat([d.fc.sc]).filter(Boolean).join('；') || '无') + '，作业：' + (d.selH.concat([d.fc.hc]).filter(Boolean).join('；') || '无') + '。教师补充：' + (d.fc.tc || '无') + '。仿写参考：' + (d.fc.im || '无') + '。';
 }
 

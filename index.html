@@ -151,7 +151,7 @@
 </div>
 
 <!-- 班级管理弹窗 -->
-<div id="classModalOverlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"><div class="flex items-center justify-between px-5 py-3 border-b bg-indigo-50/40"><h3 class="font-bold">🏫 班级与学生管理</h3><button id="closeClassModalBtn" class="text-slate-400 hover:text-slate-600">✕</button></div><div class="flex-1 overflow-hidden flex flex-col sm:flex-row"><div class="sm:w-48 border-r p-3 bg-slate-50/40"><p class="text-xs font-semibold mb-2">班级列表</p><div id="classListInModal" class="space-y-1 max-h-48 overflow-auto"></div><button id="addClassBtn" class="mt-2 text-xs text-indigo-600 hover:underline">+ 新增班级</button></div><div class="flex-1 p-4"><div class="flex justify-between"><span class="text-xs font-semibold">学生名单<span id="modalClassName"></span></span><span id="studentCountInModal" class="text-xs"></span></div><div id="studentListInModal" class="space-y-1.5 max-h-60 overflow-auto mb-3"></div><div class="flex gap-2"><input id="newStudentInput" placeholder="新学生姓名" class="input-focus-ring flex-1 px-3 py-2 rounded-lg border text-sm"><button id="addStudentBtn" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600 transition">+ 添加</button></div><p class="text-xs text-slate-400 mt-2">💡 点击姓名可编辑，右侧按钮删除</p></div></div><div class="px-5 py-3 border-t flex justify-end bg-slate-50"><button id="doneClassModalBtn" class="px-6 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition">完成</button></div></div></div>
+<div id="classModalOverlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"><div class="flex items-center justify-between px-5 py-3 border-b bg-indigo-50/40"><h3 class="font-bold">🏫 班级与学生管理</h3><button id="closeClassModalBtn" class="text-slate-400 hover:text-slate-600">✕</button></div><div class="flex-1 overflow-hidden flex flex-col sm:flex-row"><div class="sm:w-48 border-r p-3 bg-slate-50/40"><p class="text-xs font-semibold mb-2">班级列表</p><div id="classListInModal" class="space-y-1 max-h-48 overflow-auto"></div><button id="addClassBtn" class="mt-2 text-xs text-indigo-600 hover:underline">+ 新增班级</button></div><div class="flex-1 p-4"><div class="flex justify-between"><span class="text-xs font-semibold">学生名单<span id="modalClassName"></span></span><span id="studentCountInModal" class="text-xs"></span></div><div id="studentListInModal" class="space-y-1.5 max-h-60 overflow-auto mb-3"></div><div class="flex gap-2"><input id="newStudentInput" placeholder="新学生姓名" class="input-focus-ring flex-1 px-3 py-2 rounded-lg border text-sm"><button id="addStudentBtn" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600 transition">+ 添加</button></div><button id="batchImportBtn" class="w-full text-xs bg-emerald-50 text-emerald-600 py-1.5 rounded-lg mt-2 hover:bg-emerald-100 transition">📋 批量导入学生（粘贴名单）</button><p class="text-xs text-slate-400 mt-1">💡 点击姓名可编辑，右侧按钮删除</p></div></div><div class="px-5 py-3 border-t flex justify-end bg-slate-50"><button id="doneClassModalBtn" class="px-6 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition">完成</button></div></div></div>
 
 
 <!-- 作业批改弹窗 -->
@@ -204,6 +204,10 @@ function addCr(n) { setCr(getCr() + n); }
 function toast(m, t) { let e = document.createElement('div'); e.className = 'toast-enter ' + (t === 'error' ? 'bg-red-500' : t === 'success' ? 'bg-emerald-600' : 'bg-slate-800') + ' text-white px-4 py-2 rounded-lg shadow-lg text-sm mb-2'; e.textContent = m; document.getElementById('toastContainer').appendChild(e); setTimeout(function() { e.remove(); }, 2500); }
 // 预设标签搜索筛选
 function ft(inp, cid) { var q = inp.value.toLowerCase(), tags = document.querySelectorAll('#' + cid + ' .preset-tag'); tags.forEach(function(t) { t.classList.toggle('hidden-tag', q !== '' && t.textContent.toLowerCase().indexOf(q) === -1); }); }
+// 标签使用频率跟踪（常用标签优先显示）
+var tgFreq = JSON.parse(localStorage.getItem('cf_tags') || '{}');
+function tgUse(t) { tgFreq[t] = (tgFreq[t] || 0) + 1; localStorage.setItem('cf_tags', JSON.stringify(tgFreq)); }
+function tgRank(t) { return tgFreq[t] || 0; }
 // 全选可见标签
 function selAll(cid, key) { var d = sd(), arr = key === 'selL' ? d.selL : d.selP; var tags = document.querySelectorAll('#' + cid + ' .preset-tag:not(.hidden-tag)'); var allSel = true; tags.forEach(function(t) { if (arr.indexOf(t.textContent) < 0) allSel = false; }); tags.forEach(function(t) { var i = arr.indexOf(t.textContent); if (allSel) { if (i >= 0) arr.splice(i, 1); } else { if (i < 0) arr.push(t.textContent); } }); if (key === 'selL') { rLP(); rPN(); } else rPN(); saveSub(); }
 function sd() { return subData[curSubject]; }
@@ -553,11 +557,13 @@ function rLP() {
     var c = document.getElementById('lessonPresets'), p = PS[curSubject];
     if (!p || !p.L) { c.innerHTML = '<span class="text-xs text-slate-400">暂无课程</span>'; return; }
     var d = sd(); c.innerHTML = '';
-    p.L.forEach(function(item) {
+    // 按使用频率排序：常用标签靠前
+    var items = p.L.slice().sort(function(a, b) { return tgRank(b) - tgRank(a); });
+    items.forEach(function(item) {
         var t = document.createElement('span'), sel = d.selL.indexOf(item) >= 0;
         t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-slate-50' + (sel ? ' selected' : '');
         t.textContent = item;
-        t.onclick = function() { var i = d.selL.indexOf(item); if (i >= 0) d.selL.splice(i, 1); else d.selL.push(item); rLP(); rPN(); saveSub(); };
+        t.onclick = function() { var i = d.selL.indexOf(item); if (i >= 0) d.selL.splice(i, 1); else { d.selL.push(item); tgUse(item); } rLP(); rPN(); saveSub(); };
         c.appendChild(t);
     });
 }
@@ -579,7 +585,7 @@ function rPN() {
 }
 
 // 状态预设渲染（含分类标签 + 搜索筛选）
-var curStatusCat = ''; // 当前选中的状态分类
+var curStatusCat = '';
 function rSS() {
     var c = document.getElementById('statusPresets'), p = PS[curSubject];
     if (!p || !p.S) { c.innerHTML = ''; document.getElementById('statusCatBadges').innerHTML = ''; return; }
@@ -593,15 +599,24 @@ function rSS() {
         b.textContent = cat; b.onclick = function() { curStatusCat = cat; rSS(); };
         cb.appendChild(b);
     });
-    // 渲染标签（按分类分组，带 data-cat 属性）
+    // 清空当前分类选中
+    var clr = document.createElement('span');
+    clr.className = 'text-xs text-red-400 cursor-pointer hover:underline ml-1';
+    clr.textContent = '清空选中'; clr.onclick = function() {
+        p.S[curStatusCat || cats[0]].forEach(function(item) { var i = d.selS.indexOf(item); if (i >= 0) d.selS.splice(i, 1); });
+        rSS(); saveSub();
+    };
+    cb.appendChild(clr);
+    // 按频率排序渲染标签
     c.innerHTML = '';
     Object.keys(p.S).forEach(function(cat) {
         if (curStatusCat !== '' && curStatusCat !== cat) return;
-        p.S[cat].forEach(function(item) {
+        var items = p.S[cat].slice().sort(function(a, b) { return tgRank(b) - tgRank(a); });
+        items.forEach(function(item) {
             var t = document.createElement('span'), sel = d.selS.indexOf(item) >= 0;
             t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-slate-50' + (sel ? ' selected' : '');
             t.setAttribute('data-scat', cat); t.textContent = item;
-            t.onclick = function() { var i = d.selS.indexOf(item); if (i >= 0) d.selS.splice(i, 1); else d.selS.push(item); rSS(); saveSub(); };
+            t.onclick = function() { var i = d.selS.indexOf(item); if (i >= 0) d.selS.splice(i, 1); else { d.selS.push(item); tgUse(item); } rSS(); saveSub(); };
             c.appendChild(t);
         });
     });
@@ -804,6 +819,15 @@ function init() {
     document.getElementById('doneClassModalBtn').onclick = function() { document.getElementById('classModalOverlay').classList.add('hidden'); rCS(); rSP(); };
     document.getElementById('addClassBtn').onclick = function() { var n = prompt('请输入新班级名称：'); if (n && n.trim()) { classesData.push({ id: 'c' + Date.now(), name: n.trim(), students: [] }); saveCls(); rCLM(); } };
     document.getElementById('addStudentBtn').onclick = function() { var n = document.getElementById('newStudentInput').value.trim(); if (!n) return; var cls = classesData.find(function(c) { return c.id === curClassId; }); if (cls) { cls.students.push(n); saveCls(); rSLM(); document.getElementById('newStudentInput').value = ''; } };
+    document.getElementById('batchImportBtn').onclick = function() {
+        var names = prompt('请粘贴学生名单（支持换行、逗号、空格分隔）：');
+        if (!names || !names.trim()) return;
+        var cls = classesData.find(function(c) { return c.id === curClassId; }); if (!cls) { toast('请先选择班级', 'error'); return; }
+        // 按换行、逗号、中文逗号、顿号、空格拆分
+        var list = names.split(/[\n\r,，、\s]+/).map(function(n) { return n.trim(); }).filter(function(n) { return n && n.length >= 1 && n.length <= 10; });
+        var added = 0; list.forEach(function(n) { if (cls.students.indexOf(n) < 0) { cls.students.push(n); added++; } });
+        saveCls(); rSLM(); rSP(); toast('成功导入 ' + added + ' 名学生', 'success');
+    };
     // 作业分析
     document.getElementById('openHomeworkAnalysisBtn').onclick = function() { document.getElementById('hwAnalysisModal').classList.remove('hidden'); openHwCam(); };
     document.getElementById('closeHwModal').onclick = function() { document.getElementById('hwAnalysisModal').classList.add('hidden'); stopHwCam(); };

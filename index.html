@@ -104,7 +104,10 @@
                     <option value="600">详细版 (500-700字)</option>
                     <option value="900">完整版 (800-1000字)</option>
                 </select>
-                <div class="mt-3"><label class="text-xs font-semibold">✍️ 风格仿写（粘贴旧反馈，AI模仿风格）</label><textarea id="imitateStyleInput" rows="2" placeholder="粘贴您以往写的反馈，AI模仿风格…（双击放大编辑）" class="input-focus-ring w-full rounded-xl border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="imitateCharCount" class="text-xs">0/1500</span></div>
+                <div class="mt-3 space-y-3">
+                    <div><label class="text-xs font-semibold">📝 一次性仿写（清空表单时删除）</label><textarea id="imitateOnce" rows="2" placeholder="粘贴本次要模仿的反馈…双击放大" class="input-focus-ring w-full rounded-xl border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="imOnceCC" class="text-xs">0/1500</span></div>
+                    <div><label class="text-xs font-semibold">📌 固定仿写（长期保留，手动删除）</label><textarea id="imitatePerm" rows="2" placeholder="粘贴你的固定风格模板…双击放大" class="input-focus-ring w-full rounded-xl border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="imPermCC" class="text-xs">0/3000</span></div>
+                </div>
             </div>
 
             <!-- 板块配置 -->
@@ -228,8 +231,8 @@ function loadSub() { let d = localStorage.getItem('cf_subjects'); if (d) subData
 function saveCls() { localStorage.setItem('cf_classes', JSON.stringify(classesData)); }
 function loadCls() { let c = localStorage.getItem('cf_classes'); if (c) classesData = JSON.parse(c); else classesData = [{ id: 'c1', name: '五年级(1)班', students: ['张子轩', '李雨桐'] }]; if (!curClassId && classesData.length > 0) curClassId = classesData[0].id; }
 function esc(s) { if (!s) return ''; return s.replace(/[&<>]/g, function(m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]; }); }
-function saveFC() { let d = sd(); d.fc = { sn: document.getElementById('studentNameInput').value, lc: document.getElementById('lessonCustom').value, pc: document.getElementById('positiveCustom').value, nc: document.getElementById('negativeCustom').value, sc: document.getElementById('statusCustom').value, hc: document.getElementById('homeworkCustom').value, tc: document.getElementById('teacherCustomNote').value, im: document.getElementById('imitateStyleInput').value }; saveSub(); }
-function loadFC() { let c = sd().fc; document.getElementById('studentNameInput').value = c.sn || ''; document.getElementById('lessonCustom').value = c.lc || ''; document.getElementById('positiveCustom').value = c.pc || ''; document.getElementById('negativeCustom').value = c.nc || ''; document.getElementById('statusCustom').value = c.sc || ''; document.getElementById('homeworkCustom').value = c.hc || ''; document.getElementById('teacherCustomNote').value = c.tc || ''; document.getElementById('imitateStyleInput').value = c.im || ''; cc(); }
+function saveFC() { let d = sd(); d.fc = { sn: document.getElementById('studentNameInput').value, lc: document.getElementById('lessonCustom').value, pc: document.getElementById('positiveCustom').value, nc: document.getElementById('negativeCustom').value, sc: document.getElementById('statusCustom').value, hc: document.getElementById('homeworkCustom').value, tc: document.getElementById('teacherCustomNote').value, io: document.getElementById('imitateOnce').value, ip: document.getElementById('imitatePerm').value }; saveSub(); }
+function loadFC() { let c = sd().fc; document.getElementById('studentNameInput').value = c.sn || ''; document.getElementById('lessonCustom').value = c.lc || ''; document.getElementById('positiveCustom').value = c.pc || ''; document.getElementById('negativeCustom').value = c.nc || ''; document.getElementById('statusCustom').value = c.sc || ''; document.getElementById('homeworkCustom').value = c.hc || ''; document.getElementById('teacherCustomNote').value = c.tc || ''; document.getElementById('imitateOnce').value = ''; document.getElementById('imitatePerm').value = c.ip || ''; cc(); }
 function cc() {
     document.getElementById('lessonCharCount').textContent = document.getElementById('lessonCustom').value.length + '/200';
     document.getElementById('positiveCharCount').textContent = document.getElementById('positiveCustom').value.length + '/200';
@@ -237,7 +240,8 @@ function cc() {
     document.getElementById('statusCharCount').textContent = document.getElementById('statusCustom').value.length + '/200';
     document.getElementById('hwCharCount').textContent = document.getElementById('homeworkCustom').value.length + '/200';
     document.getElementById('teacherNoteCharCount').textContent = document.getElementById('teacherCustomNote').value.length + '/600';
-    document.getElementById('imitateCharCount').textContent = document.getElementById('imitateStyleInput').value.length + '/1500';
+    document.getElementById('imOnceCC').textContent = document.getElementById('imitateOnce').value.length + '/1500';
+    document.getElementById('imPermCC').textContent = document.getElementById('imitatePerm').value.length + '/3000';
 }
 
 // ============================================================
@@ -686,7 +690,7 @@ function rSC() {
 // 学科切换 / 清空
 // ============================================================
 function swSub(sub) { saveFC(); curSubject = sub; document.querySelectorAll('.subject-tab').forEach(function(t) { t.classList.remove('active'); }); var tab = document.querySelector('.subject-tab[data-subject="' + sub + '"]'); if (tab) tab.classList.add('active'); loadFC(); rLP(); rPN(); rSS(); rHP(); rSC(); }
-function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; d.fc = { sn: '', lc: '', pc: '', nc: '', sc: '', hc: '', tc: '', im: '' }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空'); }
+function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; var ip = d.fc.ip || ''; d.fc = { sn: '', lc: '', pc: '', nc: '', sc: '', hc: '', tc: '', io: '', ip: ip }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空（固定仿写已保留）'); }
 
 // ============================================================
 // AI 生成
@@ -697,7 +701,13 @@ function buildPrompt() {
     var cust = d.cs.map(function(c) { return '【' + c.title + '】'; });
     var all = secs.concat(cust);
     var sm = { formal: '【写作风格：正式严谨】你是一份面向学校的正式教学报告。使用第三人称（该生/同学），措辞客观有据，避免口语和感叹号，结构清晰完整，如学校官方评语。', friendly: '【写作风格：亲切温雅】你是一位温柔的老师在跟家长当面沟通。语气温暖如聊天，多用"我们XX同学""可以试试""不妨"等亲切表达，肯定和鼓励先行，建议委婉，结尾传递信心。', brief: '【写作风格：干练精准】用最少的话传达最多的信息。每个板块控制在2-3句以内，去掉所有修饰词和套话，不写排比句，直击核心，让家长30秒读完即懂。', literary: '【写作风格：文艺书香】用散文般的笔触书写，富有文学气息但不过度华丽。适当化用成语或古诗词意境，句子长短错落有致，让反馈读来如沐春风。' };
-    return '你是资深' + curSubject + '教学专家。为家长撰写课后反馈。' + sm[curStyle] + '。纯文本，禁止Markdown。板块标题用【】包裹：' + all.join(' → ') + '。字数约' + wordCount + '字。学生：' + (d.fc.sn || '未指定') + '，上课内容：' + (d.selL.concat([d.fc.lc]).filter(Boolean).join('；') || '未指定') + '，课堂亮点：' + (d.selP.concat([d.fc.pc]).filter(Boolean).join('；') || '无') + '，待提升：' + (d.selN.concat([d.fc.nc]).filter(Boolean).join('；') || '无') + '，学习状态：' + (d.selS.concat([d.fc.sc]).filter(Boolean).join('；') || '无') + '，作业：' + (d.selH.concat([d.fc.hc]).filter(Boolean).join('；') || '无') + '。教师补充：' + (d.fc.tc || '无') + '。仿写参考：' + (d.fc.im || '无') + '。';
+    var io = d.fc.io || '', ip = d.fc.ip || '', imitate = '';
+    if (io || ip) {
+        imitate = '【仿写要求——极其重要】请仔细模仿以下参考文本的所有风格特征：①语气口吻和说话方式 ②表情符号/emoji的使用习惯（如果参考用了🌸✨📝等表情，你也要在相应位置使用）③段落结构和排版风格 ④称呼家长和学生的方式 ⑤句子长短节奏。你的输出应该在"味道"上与参考文本高度一致。';
+        if (io) imitate += '\n本次仿写参考：' + io;
+        if (ip) imitate += '\n固定风格模板（长期）：' + ip;
+    }
+    return '你是资深' + curSubject + '教学专家。为家长撰写课后反馈。' + sm[curStyle] + '。纯文本，禁止Markdown。板块标题用【】包裹：' + all.join(' → ') + '。字数约' + wordCount + '字。学生：' + (d.fc.sn || '未指定') + '，上课内容：' + (d.selL.concat([d.fc.lc]).filter(Boolean).join('；') || '未指定') + '，课堂亮点：' + (d.selP.concat([d.fc.pc]).filter(Boolean).join('；') || '无') + '，待提升：' + (d.selN.concat([d.fc.nc]).filter(Boolean).join('；') || '无') + '，学习状态：' + (d.selS.concat([d.fc.sc]).filter(Boolean).join('；') || '无') + '，作业：' + (d.selH.concat([d.fc.hc]).filter(Boolean).join('；') || '无') + '。教师补充：' + (d.fc.tc || '无') + '。' + imitate;
 }
 
 async function handleGen() {
@@ -854,7 +864,7 @@ function init() {
     document.getElementById('wordCountSelect').onchange = function() { wordCount = parseInt(this.value); };
 
     // 文本框计数
-    ['lessonCustom','positiveCustom','negativeCustom','statusCustom','homeworkCustom','teacherCustomNote','imitateStyleInput'].forEach(function(id) { var el = document.getElementById(id); if (el) el.oninput = function() { cc(); saveFC(); }; });
+    ['lessonCustom','positiveCustom','negativeCustom','statusCustom','homeworkCustom','teacherCustomNote','imitateOnce','imitatePerm'].forEach(function(id) { var el = document.getElementById(id); if (el) el.oninput = function() { cc(); saveFC(); }; });
     document.getElementById('studentNameInput').oninput = function() { saveFC(); };
 
     // 班级 + 清空 + 生成

@@ -74,11 +74,11 @@
                     <textarea id="customNote" rows="3" placeholder="补充课堂亮点和待提升方面…AI会自动识别归类（双击放大）" class="input-focus-ring w-full rounded-lg border p-2 text-sm mt-2 db-expand" ondblclick="toggleExpand(this)"></textarea><span id="customNoteCC" class="text-xs">0/500</span>
                 </div>
                 <!-- 学习状态 -->
-                <div class="mb-4"><label class="text-xs font-semibold">📊 学习状态</label><input class="preset-search" placeholder="🔍 筛选学习状态…" oninput="ft(this,'statusPresets')"><div id="statusCatBadges" class="flex flex-wrap gap-1 mb-1"></div><div id="statusPresets" class="flex flex-wrap gap-1.5 my-2 bg-slate-50 p-2 rounded-lg max-h-40 overflow-y-auto"></div><input id="statusCustom" placeholder="💬 补充其他状态…" class="input-focus-ring w-full px-3 py-2 rounded-lg border text-sm"><span id="statusCharCount" class="text-xs">0/200</span></div>
+                <div class="mb-4"><label class="text-xs font-semibold">📊 学习状态</label><input class="preset-search" placeholder="🔍 筛选学习状态…" oninput="ft(this,'statusPresets')"><div id="statusCatBadges" class="flex flex-wrap gap-1 mb-1"></div><div id="statusPresets" class="flex flex-wrap gap-1.5 my-2 bg-slate-50 p-2 rounded-lg max-h-40 overflow-y-auto"></div><textarea id="statusCustom" rows="2" placeholder="💬 补充学习状态…（双击放大）" class="input-focus-ring w-full rounded-lg border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="statusCharCount" class="text-xs">0/300</span></div>
                 <!-- 作业 -->
-                <div class="mb-4"><div class="flex justify-between items-center"><label class="text-xs font-semibold">📝 作业情况</label><button id="openHomeworkAnalysisBtn" class="text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200 hover:bg-amber-100 transition">📷 拍照批改</button></div><input class="preset-search" placeholder="🔍 筛选作业标签…" oninput="ft(this,'homeworkPresets')"><div id="homeworkPresets" class="flex flex-wrap gap-1.5 my-2"></div><input id="homeworkCustom" placeholder="💬 补充作业细节…" class="input-focus-ring w-full px-3 py-2 rounded-lg border text-sm"><span id="hwCharCount" class="text-xs">0/200</span></div>
+                <div class="mb-4"><div class="flex justify-between items-center"><label class="text-xs font-semibold">📝 作业情况</label><button id="openHomeworkAnalysisBtn" class="text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200 hover:bg-amber-100 transition">📷 拍照批改</button></div><input class="preset-search" placeholder="🔍 筛选作业标签…" oninput="ft(this,'homeworkPresets')"><div id="homeworkPresets" class="flex flex-wrap gap-1.5 my-2"></div><textarea id="homeworkCustom" rows="2" placeholder="💬 补充作业细节…（双击放大）" class="input-focus-ring w-full rounded-lg border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="hwCharCount" class="text-xs">0/300</span></div>
                 <!-- 教师补充 -->
-                <div class="mb-3"><label class="text-xs font-semibold">✍️ 教师补充</label><textarea id="teacherCustomNote" rows="2" placeholder="个性化寄语…" class="input-focus-ring w-full rounded-xl border p-2 text-sm" maxlength="600"></textarea><span id="teacherNoteCharCount" class="text-xs">0/600</span></div>
+                <div class="mb-3"><label class="text-xs font-semibold">✍️ 教师补充</label><textarea id="teacherCustomNote" rows="2" placeholder="个性化寄语…（双击放大）" class="input-focus-ring w-full rounded-xl border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="teacherNoteCharCount" class="text-xs">0/600</span></div>
                 <div class="flex justify-between items-center"><button id="exportExcelBtn" class="text-sm text-emerald-600 hover:text-emerald-800 transition font-medium">📥 导出课堂记录表(Excel)</button><button id="clearFormBtn" class="text-sm text-slate-400 hover:text-red-500 transition">🗑️ 清空表单</button></div>
             </div>
         </div>
@@ -233,8 +233,8 @@ function loadFC() { let c = sd().fc; document.getElementById('studentNameInput')
 function cc() {
     document.getElementById('lessonCharCount').textContent = document.getElementById('lessonCustom').value.length + '/200';
     document.getElementById('customNoteCC').textContent = document.getElementById('customNote').value.length + '/500';
-    document.getElementById('statusCharCount').textContent = document.getElementById('statusCustom').value.length + '/200';
-    document.getElementById('hwCharCount').textContent = document.getElementById('homeworkCustom').value.length + '/200';
+    document.getElementById('statusCharCount').textContent = document.getElementById('statusCustom').value.length + '/300';
+    document.getElementById('hwCharCount').textContent = document.getElementById('homeworkCustom').value.length + '/300';
     document.getElementById('teacherNoteCharCount').textContent = document.getElementById('teacherCustomNote').value.length + '/600';
     document.getElementById('imOnceCC').textContent = document.getElementById('imitateOnce').value.length + '/1500';
     document.getElementById('imPermCC').textContent = document.getElementById('imitatePerm').value.length + '/3000';

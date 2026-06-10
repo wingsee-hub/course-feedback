@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-<title>AI 课后反馈生成器</title>
+<title>用的越多越好用课后反馈</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -71,10 +71,7 @@
                 <!-- 补充说明（课堂亮点+待提升合并输入区） -->
                 <div class="mb-4 bg-slate-50 rounded-xl p-3 border">
                     <label class="text-xs font-semibold">💬 补充说明（双击输入框放大编辑）</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-                        <div><label class="text-xs text-emerald-600">✨ 补充课堂亮点</label><textarea id="positiveCustom" rows="2" placeholder="补充亮点描述…" class="input-focus-ring w-full rounded-lg border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="positiveCharCount" class="text-xs">0/200</span></div>
-                        <div><label class="text-xs text-amber-600">⚠️ 补充待改进</label><textarea id="negativeCustom" rows="2" placeholder="补充待改进描述…" class="input-focus-ring w-full rounded-lg border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="negativeCharCount" class="text-xs">0/200</span></div>
-                    </div>
+                    <textarea id="customNote" rows="3" placeholder="补充课堂亮点和待提升方面…AI会自动识别归类（双击放大）" class="input-focus-ring w-full rounded-lg border p-2 text-sm mt-2 db-expand" ondblclick="toggleExpand(this)"></textarea><span id="customNoteCC" class="text-xs">0/500</span>
                 </div>
                 <!-- 学习状态 -->
                 <div class="mb-4"><label class="text-xs font-semibold">📊 学习状态</label><input class="preset-search" placeholder="🔍 筛选学习状态…" oninput="ft(this,'statusPresets')"><div id="statusCatBadges" class="flex flex-wrap gap-1 mb-1"></div><div id="statusPresets" class="flex flex-wrap gap-1.5 my-2 bg-slate-50 p-2 rounded-lg max-h-40 overflow-y-auto"></div><input id="statusCustom" placeholder="💬 补充其他状态…" class="input-focus-ring w-full px-3 py-2 rounded-lg border text-sm"><span id="statusCharCount" class="text-xs">0/200</span></div>
@@ -231,12 +228,11 @@ function loadSub() { let d = localStorage.getItem('cf_subjects'); if (d) subData
 function saveCls() { localStorage.setItem('cf_classes', JSON.stringify(classesData)); }
 function loadCls() { let c = localStorage.getItem('cf_classes'); if (c) classesData = JSON.parse(c); else classesData = [{ id: 'c1', name: '五年级(1)班', students: ['张子轩', '李雨桐'] }]; if (!curClassId && classesData.length > 0) curClassId = classesData[0].id; }
 function esc(s) { if (!s) return ''; return s.replace(/[&<>]/g, function(m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]; }); }
-function saveFC() { let d = sd(); d.fc = { sn: document.getElementById('studentNameInput').value, lc: document.getElementById('lessonCustom').value, pc: document.getElementById('positiveCustom').value, nc: document.getElementById('negativeCustom').value, sc: document.getElementById('statusCustom').value, hc: document.getElementById('homeworkCustom').value, tc: document.getElementById('teacherCustomNote').value, io: document.getElementById('imitateOnce').value, ip: document.getElementById('imitatePerm').value }; saveSub(); }
-function loadFC() { let c = sd().fc; document.getElementById('studentNameInput').value = c.sn || ''; document.getElementById('lessonCustom').value = c.lc || ''; document.getElementById('positiveCustom').value = c.pc || ''; document.getElementById('negativeCustom').value = c.nc || ''; document.getElementById('statusCustom').value = c.sc || ''; document.getElementById('homeworkCustom').value = c.hc || ''; document.getElementById('teacherCustomNote').value = c.tc || ''; document.getElementById('imitateOnce').value = ''; document.getElementById('imitatePerm').value = c.ip || ''; cc(); }
+function saveFC() { let d = sd(); d.fc = { sn: document.getElementById('studentNameInput').value, lc: document.getElementById('lessonCustom').value, cn: document.getElementById('customNote').value, sc: document.getElementById('statusCustom').value, hc: document.getElementById('homeworkCustom').value, tc: document.getElementById('teacherCustomNote').value, io: document.getElementById('imitateOnce').value, ip: document.getElementById('imitatePerm').value }; saveSub(); }
+function loadFC() { let c = sd().fc; document.getElementById('studentNameInput').value = c.sn || ''; document.getElementById('lessonCustom').value = c.lc || ''; document.getElementById('customNote').value = c.cn || ''; document.getElementById('statusCustom').value = c.sc || ''; document.getElementById('homeworkCustom').value = c.hc || ''; document.getElementById('teacherCustomNote').value = c.tc || ''; document.getElementById('imitateOnce').value = ''; document.getElementById('imitatePerm').value = c.ip || ''; cc(); }
 function cc() {
     document.getElementById('lessonCharCount').textContent = document.getElementById('lessonCustom').value.length + '/200';
-    document.getElementById('positiveCharCount').textContent = document.getElementById('positiveCustom').value.length + '/200';
-    document.getElementById('negativeCharCount').textContent = document.getElementById('negativeCustom').value.length + '/200';
+    document.getElementById('customNoteCC').textContent = document.getElementById('customNote').value.length + '/500';
     document.getElementById('statusCharCount').textContent = document.getElementById('statusCustom').value.length + '/200';
     document.getElementById('hwCharCount').textContent = document.getElementById('homeworkCustom').value.length + '/200';
     document.getElementById('teacherNoteCharCount').textContent = document.getElementById('teacherCustomNote').value.length + '/600';
@@ -690,7 +686,7 @@ function rSC() {
 // 学科切换 / 清空
 // ============================================================
 function swSub(sub) { saveFC(); curSubject = sub; document.querySelectorAll('.subject-tab').forEach(function(t) { t.classList.remove('active'); }); var tab = document.querySelector('.subject-tab[data-subject="' + sub + '"]'); if (tab) tab.classList.add('active'); loadFC(); rLP(); rPN(); rSS(); rHP(); rSC(); }
-function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; var ip = d.fc.ip || ''; d.fc = { sn: '', lc: '', pc: '', nc: '', sc: '', hc: '', tc: '', io: '', ip: ip }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空（固定仿写已保留）'); }
+function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; var ip = d.fc.ip || ''; d.fc = { sn: '', lc: '', cn: '', sc: '', hc: '', tc: '', io: '', ip: ip }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空（固定仿写已保留）'); }
 
 // ============================================================
 // AI 生成
@@ -707,7 +703,7 @@ function buildPrompt() {
         if (io) imitate += '\n本次仿写参考：' + io;
         if (ip) imitate += '\n固定风格模板（长期）：' + ip;
     }
-    return '你是资深' + curSubject + '教学专家。为家长撰写课后反馈。' + sm[curStyle] + '。纯文本，禁止Markdown。板块标题用【】包裹：' + all.join(' → ') + '。字数约' + wordCount + '字。学生：' + (d.fc.sn || '未指定') + '，上课内容：' + (d.selL.concat([d.fc.lc]).filter(Boolean).join('；') || '未指定') + '，课堂亮点：' + (d.selP.concat([d.fc.pc]).filter(Boolean).join('；') || '无') + '，待提升：' + (d.selN.concat([d.fc.nc]).filter(Boolean).join('；') || '无') + '，学习状态：' + (d.selS.concat([d.fc.sc]).filter(Boolean).join('；') || '无') + '，作业：' + (d.selH.concat([d.fc.hc]).filter(Boolean).join('；') || '无') + '。教师补充：' + (d.fc.tc || '无') + '。' + imitate;
+    return '你是资深' + curSubject + '教学专家。为家长撰写课后反馈。' + sm[curStyle] + '。纯文本，禁止Markdown。板块标题用【】包裹：' + all.join(' → ') + '。字数约' + wordCount + '字。学生：' + (d.fc.sn || '未指定') + '，上课内容：' + (d.selL.concat([d.fc.lc]).filter(Boolean).join('；') || '未指定') + '，课堂亮点：' + (d.selP.concat([]).filter(Boolean).join('；') || '无') + '，待提升：' + (d.selN.concat([]).filter(Boolean).join('；') || '无') + '，补充说明（AI自行判断归类亮点或待提升）：' + (d.fc.cn || '无') + '，学习状态：' + (d.selS.concat([d.fc.sc]).filter(Boolean).join('；') || '无') + '，作业：' + (d.selH.concat([d.fc.hc]).filter(Boolean).join('；') || '无') + '。教师补充：' + (d.fc.tc || '无') + '。' + imitate;
 }
 
 async function handleGen() {
@@ -864,7 +860,7 @@ function init() {
     document.getElementById('wordCountSelect').onchange = function() { wordCount = parseInt(this.value); };
 
     // 文本框计数
-    ['lessonCustom','positiveCustom','negativeCustom','statusCustom','homeworkCustom','teacherCustomNote','imitateOnce','imitatePerm'].forEach(function(id) { var el = document.getElementById(id); if (el) el.oninput = function() { cc(); saveFC(); }; });
+    ['lessonCustom','customNote','statusCustom','homeworkCustom','teacherCustomNote','imitateOnce','imitatePerm'].forEach(function(id) { var el = document.getElementById(id); if (el) el.oninput = function() { cc(); saveFC(); }; });
     document.getElementById('studentNameInput').oninput = function() { saveFC(); };
 
     // 班级 + 清空 + 生成
@@ -915,7 +911,7 @@ function init() {
     document.getElementById('uploadHwImage').onchange = handleFU;
     document.getElementById('provideAnswerCheckbox').onchange = function() { document.getElementById('answerInputDiv').classList.toggle('hidden', !this.checked); };
     document.getElementById('applyToHomeworkBtn').onclick = function() { document.getElementById('homeworkCustom').value = document.getElementById('hwAnalysisResultContent').textContent; cc(); saveFC(); toast('已应用', 'success'); };
-    document.getElementById('applyToNoteBtn').onclick = function() { document.getElementById('teacherCustomNote').value = document.getElementById('hwAnalysisResultContent').textContent; cc(); saveFC(); toast('已应用', 'success'); };
+    document.getElementById('applyToNoteBtn').onclick = function() { document.getElementById('customNote').value = document.getElementById('hwAnalysisResultContent').textContent; cc(); saveFC(); toast('已应用', 'success'); };
 
     // 服务协议弹窗
     document.getElementById('closeTosBtn').onclick = function() { document.getElementById('tosModal').classList.add('hidden'); };

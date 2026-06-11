@@ -31,6 +31,8 @@
 .status-cat-badge{cursor:pointer;font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid #cbd5e1;background:#fff;color:#64748b;transition:all .15s;user-select:none}.status-cat-badge:hover{background:#eef2ff;border-color:#818cf8;color:#4f46e5}.status-cat-badge.active{background:#4f46e5;color:#fff;border-color:#4f46e5}
 .db-expand{transition:all .2s;resize:vertical}.db-expand.big{min-height:160px!important;font-size:15px!important;z-index:10;position:relative}
 .cust-tag .edit-tag,.cust-tag .del-tag{display:none;margin-left:4px;font-size:10px;cursor:pointer;opacity:.7}.cust-tag:hover .edit-tag,.cust-tag:hover .del-tag{display:inline}.cust-tag .edit-tag:hover,.cust-tag .del-tag:hover{opacity:1}
+.voice-btn{display:inline-flex;align-items:center;gap:2px;font-size:11px;cursor:pointer;padding:2px 6px;border-radius:12px;border:1px solid #cbd5e1;background:#fff;color:#64748b;transition:all .2s;white-space:nowrap;margin-left:4px}.voice-btn:hover{background:#eef2ff;border-color:#818cf8;color:#4f46e5}.voice-btn.recording{background:#fef2f2;border-color:#ef4444;color:#ef4444;animation:pulse .8s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media(max-width:640px){.preset-tag{font-size:12px!important;padding:4px 10px!important;margin:3px 2px}.preset-search{font-size:13px!important;padding:6px 10px!important}textarea,input[type=text],input[type=tel]{font-size:16px!important}.btn-gradient{font-size:16px!important}body{font-size:15px}.credit-badge{font-size:14px!important;padding:5px 16px!important}}
 </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-indigo-50/20 to-white min-h-screen">
@@ -86,7 +88,7 @@
                     <div class="flex-1 min-w-[140px]"><label class="text-xs font-semibold">👤 学生姓名</label><input id="studentNameInput" placeholder="输入或点击下方标签" class="input-focus-ring w-full px-3 py-2 rounded-xl border"><div id="studentNamePresets" class="flex flex-wrap gap-1.5 mt-2"></div></div>
                 </div>
                 <!-- 上课内容 -->
-                <div class="mb-4"><div class="flex justify-between items-center"><label class="text-xs font-semibold">📚 上课内容（可多选标签，标签决定后续选项）</label><span class="text-xs text-indigo-500 cursor-pointer hover:underline" onclick="selAll('lessonPresets','selL')">全选可见</span></div><input class="preset-search" placeholder="🔍 筛选上课内容…" oninput="ft(this,'lessonPresets')"><div id="lessonPresets" class="flex flex-wrap gap-1.5 my-2"></div><textarea id="lessonCustom" rows="2" placeholder="💬 补充上课内容…（双击放大编辑）" class="input-focus-ring w-full px-3 py-2 rounded-lg border text-sm mt-1 db-expand" ondblclick="toggleExpand(this)"></textarea><span id="lessonCharCount" class="text-xs text-slate-400">0/200</span></div>
+                <div class="mb-4"><div class="flex justify-between items-center"><label class="text-xs font-semibold">📚 上课内容（可多选标签，标签决定后续选项）</label><span class="text-xs text-indigo-500 cursor-pointer hover:underline" onclick="selAll('lessonPresets','selL')">全选可见</span></div><input class="preset-search" placeholder="🔍 筛选上课内容…" oninput="ft(this,'lessonPresets')"><div id="lessonPresets" class="flex flex-wrap gap-1.5 my-2"></div><div class="flex gap-2 mt-1 mb-2"><input id="newLessonInput" placeholder="自定义课程标签" class="flex-1 input-focus-ring px-3 py-1.5 rounded-lg border text-sm"><button id="addLessonCustomBtn" class="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm whitespace-nowrap hover:bg-indigo-600">➕ 添加课程</button></div><textarea id="lessonCustom" rows="2" placeholder="💬 补充上课内容…（双击放大编辑）" class="input-focus-ring w-full px-3 py-2 rounded-lg border text-sm mt-1 db-expand" ondblclick="toggleExpand(this)"></textarea><span id="lessonCharCount" class="text-xs text-slate-400">0/200</span> <span class="voice-btn" onclick="startVoice('lessonCustom',this)" title="语音输入">🎤</span></div>
                 <!-- 课堂亮点 -->
                 <div class="mb-3"><label class="text-xs font-semibold text-emerald-700">✨ 课堂亮点（基于所选内容动态展示）</label><div id="positivePerformancePresets" class="flex flex-wrap gap-1.5 my-2 bg-emerald-50/30 p-2 rounded-lg min-h-[40px]"></div><div class="flex gap-2 mt-1"><input id="newPositiveInput" placeholder="自定义亮点标签" class="flex-1 input-focus-ring px-3 py-1.5 rounded-lg border text-sm"><button id="addPositiveCustomBtn" class="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm whitespace-nowrap hover:bg-emerald-600">➕ 添加</button></div></div>
                 <!-- 待提升 -->
@@ -94,14 +96,14 @@
                 <!-- 补充说明（课堂亮点+待提升合并输入区） -->
                 <div class="mb-4 bg-slate-50 rounded-xl p-3 border">
                     <label class="text-xs font-semibold">💬 补充说明（双击输入框放大编辑）</label>
-                    <textarea id="customNote" rows="3" placeholder="补充课堂亮点和待提升方面…AI会自动识别归类（双击放大）" class="input-focus-ring w-full rounded-lg border p-2 text-sm mt-2 db-expand" ondblclick="toggleExpand(this)"></textarea><span id="customNoteCC" class="text-xs">0/500</span>
+                    <textarea id="customNote" rows="3" placeholder="补充课堂亮点和待提升方面…AI会自动识别归类（双击放大）" class="input-focus-ring w-full rounded-lg border p-2 text-sm mt-2 db-expand" ondblclick="toggleExpand(this)"></textarea><span id="customNoteCC" class="text-xs">0/500</span> <span class="voice-btn" onclick="startVoice('customNote',this)" title="语音输入">🎤</span>
                 </div>
                 <!-- 学习状态 -->
                 <div class="mb-4"><label class="text-xs font-semibold">📊 学习状态</label><input class="preset-search" placeholder="🔍 筛选学习状态…" oninput="ft(this,'statusPresets')"><div id="statusCatBadges" class="flex flex-wrap gap-1 mb-1"></div><div id="statusPresets" class="flex flex-wrap gap-1.5 my-2 bg-slate-50 p-2 rounded-lg max-h-40 overflow-y-auto"></div><textarea id="statusCustom" rows="2" placeholder="💬 补充学习状态…（双击放大）" class="input-focus-ring w-full rounded-lg border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="statusCharCount" class="text-xs">0/300</span></div>
                 <!-- 作业 -->
                 <div class="mb-4"><div class="flex justify-between items-center"><label class="text-xs font-semibold">📝 作业情况</label><button id="openHomeworkAnalysisBtn" class="text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200 hover:bg-amber-100 transition">📷 拍照批改</button></div><input class="preset-search" placeholder="🔍 筛选作业标签…" oninput="ft(this,'homeworkPresets')"><div id="homeworkPresets" class="flex flex-wrap gap-1.5 my-2"></div><textarea id="homeworkCustom" rows="2" placeholder="💬 补充作业细节…（双击放大）" class="input-focus-ring w-full rounded-lg border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="hwCharCount" class="text-xs">0/300</span></div>
                 <!-- 教师补充 -->
-                <div class="mb-3"><label class="text-xs font-semibold">✍️ 教师补充</label><textarea id="teacherCustomNote" rows="2" placeholder="个性化寄语…（双击放大）" class="input-focus-ring w-full rounded-xl border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="teacherNoteCharCount" class="text-xs">0/600</span></div>
+                <div class="mb-3"><label class="text-xs font-semibold">✍️ 教师补充</label><textarea id="teacherCustomNote" rows="2" placeholder="个性化寄语…（双击放大）" class="input-focus-ring w-full rounded-xl border p-2 text-sm db-expand" ondblclick="toggleExpand(this)"></textarea><span id="teacherNoteCharCount" class="text-xs">0/600</span> <span class="voice-btn" onclick="startVoice('teacherCustomNote',this)" title="语音输入">🎤</span></div>
                 <div class="flex justify-between items-center"><button id="exportExcelBtn" class="text-sm text-emerald-600 hover:text-emerald-800 transition font-medium">📥 导出课堂记录表(Excel)</button><button id="clearFormBtn" class="text-sm text-slate-400 hover:text-red-500 transition">🗑️ 清空表单</button></div>
             </div>
         </div>
@@ -235,6 +237,20 @@ function addCr(n) { setCr(getCr() + n); }
 // Toast / 工具函数
 // ============================================================
 function toast(m, t) { let e = document.createElement('div'); e.className = 'toast-enter ' + (t === 'error' ? 'bg-red-500' : t === 'success' ? 'bg-emerald-600' : 'bg-slate-800') + ' text-white px-4 py-2 rounded-lg shadow-lg text-sm mb-2'; e.textContent = m; document.getElementById('toastContainer').appendChild(e); setTimeout(function() { e.remove(); }, 2500); }
+// 语音识别输入
+var voiceRec = null, voiceTarget = null;
+function startVoice(elId, btn) {
+    if (voiceRec) { stopVoice(); return; }
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { toast('您的浏览器不支持语音识别，请使用Chrome或Edge浏览器', 'error'); return; }
+    voiceRec = new SpeechRecognition(); voiceRec.lang = 'zh-CN'; voiceRec.interimResults = true; voiceRec.continuous = true;
+    voiceTarget = document.getElementById(elId); btn.classList.add('recording'); btn.textContent = '🎤🔴';
+    voiceRec.onresult = function(e) { var t = ''; for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; voiceTarget.value = (voiceTarget.value ? voiceTarget.value + t : t); saveFC(); cc(); };
+    voiceRec.onend = function() { stopVoice(); };
+    voiceRec.onerror = function() { stopVoice(); toast('语音识别出错，请重试', 'error'); };
+    voiceRec.start(); toast('🎤 正在聆听…点击按钮停止', 'info');
+}
+function stopVoice() { if (voiceRec) { voiceRec.stop(); voiceRec = null; } if (voiceTarget) voiceTarget = null; document.querySelectorAll('.voice-btn.recording').forEach(function(b) { b.classList.remove('recording'); b.textContent = '🎤'; }); }
 // 双击放大输入框
 function toggleExpand(el) { el.classList.toggle('big'); }
 // 预设标签搜索筛选
@@ -584,7 +600,7 @@ const PS = {};
 for (var sub in PS) {
     subData[sub] = {
         selL: [], selP: [], selN: [], selS: [], selH: [],
-        uP: [], uN: [],
+        uL: [], uP: [], uN: [],
         es: ['teaching_review','highlights','improvement_space','learning_status','suggestions','homework_notes'],
         cs: [],
         fc: { sn: '', lc: '', pc: '', nc: '', sc: '', hc: '', tc: '', im: '' }
@@ -625,6 +641,19 @@ function rLP() {
         t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-slate-50' + (sel ? ' selected' : '');
         t.textContent = item;
         t.onclick = function() { var i = d.selL.indexOf(item); if (i >= 0) d.selL.splice(i, 1); else { d.selL.push(item); tgUse(item); } rLP(); rPN(); rSS(); saveSub(); };
+        c.appendChild(t);
+    });
+    // 自定义课程（cust-tag 带编辑删除）
+    d.uL.forEach(function(item) {
+        var t = document.createElement('span'), sel = d.selL.indexOf(item) >= 0;
+        t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-indigo-50 text-indigo-700 cust-tag' + (sel ? ' selected' : '');
+        t.textContent = item;
+        var eBtn = document.createElement('span'); eBtn.className = 'edit-tag'; eBtn.textContent = '✎';
+        eBtn.onclick = function(ev) { ev.stopPropagation(); var n = prompt('修改课程：', item); if (n && n.trim()) { var idx = d.uL.indexOf(item); if (idx >= 0) d.uL[idx] = n.trim(); var j = d.selL.indexOf(item); if (j >= 0) d.selL[j] = n.trim(); rLP(); saveSub(); } };
+        var dBtn = document.createElement('span'); dBtn.className = 'del-tag'; dBtn.textContent = '✕';
+        dBtn.onclick = function(ev) { ev.stopPropagation(); d.uL = d.uL.filter(function(x) { return x !== item; }); d.selL = d.selL.filter(function(x) { return x !== item; }); rLP(); saveSub(); };
+        t.appendChild(eBtn); t.appendChild(dBtn);
+        t.onclick = function(e) { if (e.target === t) { var i = d.selL.indexOf(item); if (i >= 0) d.selL.splice(i, 1); else { d.selL.push(item); tgUse(item); } rLP(); rPN(); rSS(); saveSub(); } };
         c.appendChild(t);
     });
 }
@@ -748,7 +777,7 @@ function rSC() {
 // 学科切换 / 清空
 // ============================================================
 function swSub(sub) { saveFC(); curSubject = sub; curMathLevel = ''; document.querySelectorAll('.subject-tab').forEach(function(t) { t.classList.remove('active'); }); var tab = document.querySelector('.subject-tab[data-subject="' + sub + '"]'); if (tab) tab.classList.add('active'); loadFC(); rLP(); rPN(); rSS(); rHP(); rSC(); }
-function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; var ip = d.fc.ip || ''; d.fc = { sn: '', lc: '', cn: '', sc: '', hc: '', tc: '', io: '', ip: ip }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空（固定仿写已保留）'); }
+function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; d.uL = []; var ip = d.fc.ip || ''; d.fc = { sn: '', lc: '', cn: '', sc: '', hc: '', tc: '', io: '', ip: ip }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空（固定仿写已保留）'); }
 
 // ============================================================
 // AI 生成
@@ -932,6 +961,7 @@ function init() {
     document.getElementById('exportExcelBtn').onclick = exportExcel;
 
     // 添加自定义亮点/待提升
+    document.getElementById('addLessonCustomBtn').onclick = function() { var v = document.getElementById('newLessonInput').value.trim(); if (!v) return; var d = sd(); d.uL.push(v); d.selL.push(v); tgUse(v); document.getElementById('newLessonInput').value = ''; saveSub(); rLP(); rPN(); rSS(); };
     document.getElementById('addPositiveCustomBtn').onclick = function() { var v = document.getElementById('newPositiveInput').value.trim(); if (!v) return; var d = sd(); d.uP.push(v); d.selP.push(v); document.getElementById('newPositiveInput').value = ''; saveSub(); rPN(); };
     document.getElementById('addNegativeCustomBtn').onclick = function() { var v = document.getElementById('newNegativeInput').value.trim(); if (!v) return; var d = sd(); d.uN.push(v); d.selN.push(v); document.getElementById('newNegativeInput').value = ''; saveSub(); rPN(); };
 

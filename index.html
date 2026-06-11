@@ -241,16 +241,16 @@ function toast(m, t) { let e = document.createElement('div'); e.className = 'toa
 var voiceRec = null, voiceTarget = null;
 function startVoice(elId, btn) {
     if (voiceRec) { stopVoice(); return; }
-    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { toast('您的浏览器不支持语音识别，请使用Chrome或Edge浏览器', 'error'); return; }
-    voiceRec = new SpeechRecognition(); voiceRec.lang = 'zh-CN'; voiceRec.interimResults = true; voiceRec.continuous = true;
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { toast('请使用Chrome或Edge浏览器', 'error'); return; }
+    voiceRec = new SR(); voiceRec.lang = 'zh-CN'; voiceRec.interimResults = false; voiceRec.continuous = false;
     voiceTarget = document.getElementById(elId); btn.classList.add('recording'); btn.textContent = '🎤🔴';
-    voiceRec.onresult = function(e) { var t = ''; for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; voiceTarget.value = (voiceTarget.value ? voiceTarget.value + t : t); saveFC(); cc(); };
+    voiceRec.onresult = function(e) { var t = e.results[0][0].transcript; voiceTarget.value = (voiceTarget.value ? voiceTarget.value + t : t); saveFC(); cc(); };
+    voiceRec.onerror = function(e) { stopVoice(); if (e.error !== 'no-speech') toast('语音识别失败', 'error'); };
     voiceRec.onend = function() { stopVoice(); };
-    voiceRec.onerror = function() { stopVoice(); toast('语音识别出错，请重试', 'error'); };
-    voiceRec.start(); toast('🎤 正在聆听…点击按钮停止', 'info');
+    voiceRec.start(); toast('🎤 正在聆听…', 'info');
 }
-function stopVoice() { if (voiceRec) { voiceRec.stop(); voiceRec = null; } if (voiceTarget) voiceTarget = null; document.querySelectorAll('.voice-btn.recording').forEach(function(b) { b.classList.remove('recording'); b.textContent = '🎤'; }); }
+function stopVoice() { if (voiceRec) { try { voiceRec.stop(); } catch(e) {} voiceRec = null; } document.querySelectorAll('.voice-btn.recording').forEach(function(b) { b.classList.remove('recording'); b.textContent = '🎤'; }); voiceTarget = null; }
 // 双击放大输入框
 function toggleExpand(el) { el.classList.toggle('big'); }
 // 预设标签搜索筛选
@@ -664,15 +664,16 @@ function rPN() {
     if (!d.uL) d.uL = []; if (!d.uP) d.uP = []; if (!d.uN) d.uN = [];
     var pm = p.P || {}, nm = p.N || {}, ap = {}, an = {};
     d.selL.forEach(function(l) { if (pm[l]) pm[l].forEach(function(x) { ap[x] = 1; }); if (nm[l]) nm[l].forEach(function(x) { an[x] = 1; }); });
-    // 联动学习状态：选中上课内容后自动匹配对应分类的状态标签
+    // 联动学习状态：选上课内容后自动切换到对应状态分类标签
     if (p.S && d.selL.length > 0) {
-        var matched = false;
+        var foundCat = null;
         d.selL.forEach(function(l) {
-            var sKey = Object.keys(p.S).find(function(k) { return k === l || l.indexOf(k) >= 0; });
-            if (sKey) { p.S[sKey].forEach(function(s) { if (d.selS.indexOf(s) < 0) { d.selS.push(s); matched = true; } }); }
+            if (!foundCat) {
+                var cat = Object.keys(p.S).find(function(k) { return k === l || l.indexOf(k) >= 0 || k.indexOf(l) >= 0; });
+                if (cat) foundCat = cat;
+            }
         });
-        if (p.S['通用']) p.S['通用'].forEach(function(s) { if (d.selS.indexOf(s) < 0) d.selS.push(s); });
-        if (matched) saveSub();
+        if (foundCat) { curStatusCat = foundCat; rSS(); }
     }
     if (pm['通用']) pm['通用'].forEach(function(x) { ap[x] = 1; });
     if (nm['通用']) nm['通用'].forEach(function(x) { an[x] = 1; });

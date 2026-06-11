@@ -760,7 +760,7 @@ function rSC() {
 // 学科切换 / 清空
 // ============================================================
 function swSub(sub) { saveFC(); curSubject = sub; curMathLevel = ''; document.querySelectorAll('.subject-tab').forEach(function(t) { t.classList.remove('active'); }); var tab = document.querySelector('.subject-tab[data-subject="' + sub + '"]'); if (tab) tab.classList.add('active'); loadFC(); rLP(); rPN(); rSS(); rHP(); rSC(); }
-function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; d.uL = []; var ip = d.fc.ip || ''; d.fc = { sn: '', lc: '', cn: '', sc: '', hc: '', tc: '', io: '', ip: ip }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空（固定仿写已保留）'); }
+function clrForm() { var d = sd(); d.selL = []; d.selP = []; d.selN = []; d.selS = []; d.selH = []; d.uL = []; curStatusCat = ''; curMathLevel = ''; var ip = d.fc.ip || ''; d.fc = { sn: '', lc: '', cn: '', sc: '', hc: '', tc: '', io: '', ip: ip }; saveSub(); loadFC(); rLP(); rPN(); rSS(); rHP(); document.getElementById('resultContent').classList.add('hidden'); document.getElementById('resultPlaceholder').classList.remove('hidden'); document.getElementById('resultError').classList.add('hidden'); document.getElementById('copyResultBtn').disabled = true; document.getElementById('downloadResultBtn').disabled = true; toast('表单已清空（固定仿写已保留）'); }
 
 // ============================================================
 // AI 生成
@@ -944,6 +944,10 @@ function init() {
     document.getElementById('exportExcelBtn').onclick = exportExcel;
 
     // 添加自定义亮点/待提升
+    document.getElementById('newLessonInput').onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('addLessonCustomBtn').click(); };
+    document.getElementById('newPositiveInput').onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('addPositiveCustomBtn').click(); };
+    document.getElementById('newNegativeInput').onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('addNegativeCustomBtn').click(); };
+    document.getElementById('newStudentInput').onkeydown = function(e) { if (e.key === 'Enter') document.getElementById('addStudentBtn').click(); };
     document.getElementById('addLessonCustomBtn').onclick = function() { var v = document.getElementById('newLessonInput').value.trim(); if (!v) return; var d = sd(); d.uL.push(v); d.selL.push(v); tgUse(v); document.getElementById('newLessonInput').value = ''; saveSub(); rLP(); rPN(); rSS(); };
     document.getElementById('addPositiveCustomBtn').onclick = function() { var v = document.getElementById('newPositiveInput').value.trim(); if (!v) return; var d = sd(); d.uP.push(v); d.selP.push(v); document.getElementById('newPositiveInput').value = ''; saveSub(); rPN(); };
     document.getElementById('addNegativeCustomBtn').onclick = function() { var v = document.getElementById('newNegativeInput').value.trim(); if (!v) return; var d = sd(); d.uN.push(v); d.selN.push(v); document.getElementById('newNegativeInput').value = ''; saveSub(); rPN(); };

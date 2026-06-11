@@ -32,7 +32,7 @@
 .db-expand{transition:all .2s;resize:vertical}.db-expand.big{min-height:160px!important;font-size:15px!important;z-index:10;position:relative}
 .cust-tag .edit-tag,.cust-tag .del-tag{display:none;margin-left:4px;font-size:10px;cursor:pointer;opacity:.7}.cust-tag:hover .edit-tag,.cust-tag:hover .del-tag{display:inline}.cust-tag .edit-tag:hover,.cust-tag .del-tag:hover{opacity:1}
 .voice-btn{display:inline-flex;align-items:center;gap:2px;font-size:11px;cursor:pointer;padding:2px 6px;border-radius:12px;border:1px solid #cbd5e1;background:#fff;color:#64748b;transition:all .2s;white-space:nowrap;margin-left:4px}.voice-btn:hover{background:#eef2ff;border-color:#818cf8;color:#4f46e5}.voice-btn.recording{background:#fef2f2;border-color:#ef4444;color:#ef4444;animation:pulse .8s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-@media(max-width:640px){.preset-tag{font-size:12px!important;padding:4px 10px!important;margin:3px 2px}.preset-search{font-size:13px!important;padding:6px 10px!important}textarea,input[type=text],input[type=tel]{font-size:16px!important}.btn-gradient{font-size:16px!important}body{font-size:15px}.credit-badge{font-size:14px!important;padding:5px 16px!important}}
+@media(max-width:640px){.preset-tag{font-size:11px!important;padding:3px 8px!important}textarea,input[type=text],input[type=tel],select{font-size:16px!important}}
 </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-indigo-50/20 to-white min-h-screen">
@@ -263,7 +263,7 @@ function tgRank(t) { return tgFreq[t] || 0; }
 function selAll(cid, key) { var d = sd(), arr = key === 'selL' ? d.selL : d.selP; var tags = document.querySelectorAll('#' + cid + ' .preset-tag:not(.hidden-tag)'); var allSel = true; tags.forEach(function(t) { if (arr.indexOf(t.textContent) < 0) allSel = false; }); tags.forEach(function(t) { var i = arr.indexOf(t.textContent); if (allSel) { if (i >= 0) arr.splice(i, 1); } else { if (i < 0) arr.push(t.textContent); } }); if (key === 'selL') { rLP(); rPN(); rSS(); } else rPN(); saveSub(); }
 function sd() { return subData[curSubject]; }
 function saveSub() { localStorage.setItem('cf_subjects', JSON.stringify(subData)); }
-function loadSub() { let d = localStorage.getItem('cf_subjects'); if (d) subData = JSON.parse(d); }
+function loadSub() { var d = localStorage.getItem('cf_subjects'); if (d) { subData = JSON.parse(d); for (var s in subData) { if (!subData[s].uL) subData[s].uL = []; if (!subData[s].uP) subData[s].uP = []; if (!subData[s].uN) subData[s].uN = []; } } }
 function saveCls() { localStorage.setItem('cf_classes', JSON.stringify(classesData)); }
 function loadCls() { let c = localStorage.getItem('cf_classes'); if (c) classesData = JSON.parse(c); else classesData = [{ id: 'c1', name: '五年级(1)班', students: ['张子轩', '李雨桐'] }]; if (!curClassId && classesData.length > 0) curClassId = classesData[0].id; }
 function esc(s) { if (!s) return ''; return s.replace(/[&<>]/g, function(m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]; }); }
@@ -661,20 +661,18 @@ function rLP() {
 
 function rPN() {
     var d = sd(), p = PS[curSubject]; if (!p) return;
+    if (!d.uL) d.uL = []; if (!d.uP) d.uP = []; if (!d.uN) d.uN = [];
     var pm = p.P || {}, nm = p.N || {}, ap = {}, an = {};
     d.selL.forEach(function(l) { if (pm[l]) pm[l].forEach(function(x) { ap[x] = 1; }); if (nm[l]) nm[l].forEach(function(x) { an[x] = 1; }); });
-    // 联动学习状态：选中上课内容后自动匹配对应状态标签
+    // 联动学习状态：选中上课内容后自动匹配对应分类的状态标签
     if (p.S && d.selL.length > 0) {
+        var matched = false;
         d.selL.forEach(function(l) {
-            Object.keys(p.S).forEach(function(cat) {
-                if (cat === l || l.indexOf(cat) >= 0 || cat.indexOf(l) >= 0) {
-                    p.S[cat].forEach(function(s) { if (d.selS.indexOf(s) < 0) d.selS.push(s); });
-                }
-            });
+            var sKey = Object.keys(p.S).find(function(k) { return k === l || l.indexOf(k) >= 0; });
+            if (sKey) { p.S[sKey].forEach(function(s) { if (d.selS.indexOf(s) < 0) { d.selS.push(s); matched = true; } }); }
         });
-        // 也加入通用状态
         if (p.S['通用']) p.S['通用'].forEach(function(s) { if (d.selS.indexOf(s) < 0) d.selS.push(s); });
-        saveSub();
+        if (matched) saveSub();
     }
     if (pm['通用']) pm['通用'].forEach(function(x) { ap[x] = 1; });
     if (nm['通用']) nm['通用'].forEach(function(x) { an[x] = 1; });

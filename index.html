@@ -644,6 +644,7 @@ function rLP() {
         c.appendChild(t);
     });
     // 自定义课程（cust-tag 带编辑删除）
+    if (!d.uL) d.uL = [];
     d.uL.forEach(function(item) {
         var t = document.createElement('span'), sel = d.selL.indexOf(item) >= 0;
         t.className = 'preset-tag px-2.5 py-1 rounded-full text-xs border bg-indigo-50 text-indigo-700 cust-tag' + (sel ? ' selected' : '');
